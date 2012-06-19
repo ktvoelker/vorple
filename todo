@@ -2,9 +2,13 @@
 To-Do
 =====
 
+Add CSRF protection to the Comm library
+
+Implement stubs in the Comm library
+
+Add support for monadic actions in the Comm library
+
 Find a good templating library
 
 Look at URL routing libraries
-
-Make a library to handle our own background communication protocol
 
