@@ -12,9 +12,8 @@ main = do
   args <- getArgs
   let
   { runner = case args of
-      ["fcgi"] -> scottyApp >=> FastCGI.run
       ["warp"] -> scotty 3000
-      _ -> const $ putStrLn "Usage: Main [fcgi|warp]"
+      _ -> scottyApp >=> FastCGI.run
   }
   runner $ do
     get "/" $ do
