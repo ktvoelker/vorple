@@ -1,0 +1,13 @@
+
+The Apache config section should look like this (from the mod_fcgi docs):
+
+<Directory /usr/local/apache/fcgi-bin/>
+SetHandler fcgid-script
+Options +ExecCGI
+
+# Customize the next two directives for your requirements.
+Order allow,deny
+Allow from all
+</Directory>
+
+
