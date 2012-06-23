@@ -2,11 +2,7 @@
 To-Do
 =====
 
-Implement stubs in the Comm library
+Add multi-threading support to the Comm library with worker threads
 
-Add support for monadic actions in the Comm library
-
-Find a good templating library
-
-Look at URL routing libraries
+  Make a separate random secret generator per-thread
 

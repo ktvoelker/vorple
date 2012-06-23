@@ -4,24 +4,19 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Comm where
 
+import Control.Monad.Trans
 import Data.Aeson.Types
+import qualified Data.Text.Lazy as Text
+import GHC.Exts (fromString)
+import Network.HTTP.Types (Status(), unauthorized401)
+import System.Random
 import Web.Scotty
 
--- TODO replace
-type User = Int
+newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 
--- TODO replace
-type Secret = Int
+newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
--- TODO replace
-type Error = Int
-
-badAuth, badData :: Error
-badData = 401
-badAuth = 402
-badSecret = 403
-
-data Cookie = Cookie User Secret deriving (Eq, Ord, Show)
+data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
 data Method = Get | Post | Put | Delete deriving (Eq, Ord, Enum, Bounded, Show)
 
@@ -38,54 +33,43 @@ runTarget :: Target a -> (a -> ActionM ()) -> ScottyM ()
 runTarget _ _ = return ()
 
 data Handler a b c =
-    RequireAuth   (User -> a -> b -> Either Error c)
-  | DoesAuth      (a -> b -> Either Error (User, c))
-  | NoRequireAuth (a -> b -> Either Error c)
+    RequireAuth   (User -> a -> b -> IO c)
+  | DoesAuth      (a -> b -> IO (User, c))
+  | NoRequireAuth (a -> b -> IO c)
 
-result :: (ToJSON a) => Either Error a -> ActionM ()
-result (Left e) = failure e
-result (Right d) = success d
-
--- TODO
-success :: (ToJSON a) => a -> ActionM ()
-success = const $ return ()
+result :: (ToJSON a) => IO a -> ActionM ()
+result r = liftIO r >>= json
 
 -- TODO
-failure :: Error -> ActionM ()
-failure = const $ return ()
-
--- TODO
+-- Find a Cookie header in requestHeaders for the session key and parse out the body
 getCookie :: ActionM (Maybe Cookie)
 getCookie = return Nothing
 
--- TODO
 setCookie :: Cookie -> ActionM ()
-setCookie = const $ return ()
+setCookie = header "Set-Cookie" . ("session=" `Text.append`) . fromString . show
 
--- TODO
 makeSecret :: ActionM Secret
-makeSecret = return 0
+makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
 runHandler :: (FromJSON b, ToJSON c) => Handler a b c -> a -> ActionM ()
 runHandler h p = do
   (j :: b) <- jsonData
   case h of
     NoRequireAuth h -> result $ h p j
-    DoesAuth h -> case h p j of
-      (Left e) -> failure e
-      (Right (u, r)) -> do
-        s <- makeSecret
-        setCookie $ Cookie u s
-        result $ Right r
+    DoesAuth h -> do
+      (u, r) <- liftIO $ h p j
+      s <- makeSecret
+      setCookie $ Cookie u s
+      json r
     RequireAuth h -> do
       c <- getCookie
       case c of
-        Nothing -> failure badAuth
+        Nothing -> status unauthorized401
         Just (Cookie u s) -> do
           a <- param "secret"
-          if a == s
+          if Secret a == s
           then result $ h u p j
-          else failure badSecret
+          else status unauthorized401
 
 serve :: (FromJSON b, ToJSON c) => (Target a, Handler a b c) -> ScottyM ()
 serve (target, handler) = runTarget target $ runHandler handler
