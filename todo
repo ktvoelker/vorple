@@ -2,7 +2,7 @@
 To-Do
 =====
 
-Add multi-threading support to the Comm library with worker threads
+Implement runTarget
 
-  Make a separate random secret generator per-thread
+Implement getCookie
 
