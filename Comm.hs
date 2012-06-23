@@ -1,21 +1,17 @@
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Comm where
 
+import Data.Aeson.Types
 import Web.Scotty
 
 -- TODO replace
-type Json = String
-
--- TODO
-parseJson :: String -> Maybe Json
-parseJson _ = Nothing
+type User = Int
 
 -- TODO replace
-type User = Int
+type Secret = Int
 
 -- TODO replace
 type Error = Int
@@ -23,6 +19,9 @@ type Error = Int
 badAuth, badData :: Error
 badData = 401
 badAuth = 402
+badSecret = 403
+
+data Cookie = Cookie User Secret deriving (Eq, Ord, Show)
 
 data Method = Get | Post | Put | Delete deriving (Eq, Ord, Enum, Bounded, Show)
 
@@ -38,48 +37,56 @@ data Target a = Target
 runTarget :: Target a -> (a -> ActionM ()) -> ScottyM ()
 runTarget _ _ = return ()
 
-data Handler a =
-    RequireAuth   (User -> a -> Json -> Either Error Json)
-  | DoesAuth      (a -> Json -> Either Error (User, Json))
-  | NoRequireAuth (a -> Json -> Either Error Json)
+data Handler a b c =
+    RequireAuth   (User -> a -> b -> Either Error c)
+  | DoesAuth      (a -> b -> Either Error (User, c))
+  | NoRequireAuth (a -> b -> Either Error c)
+
+result :: (ToJSON a) => Either Error a -> ActionM ()
+result (Left e) = failure e
+result (Right d) = success d
 
 -- TODO
-result :: Either Error Json -> ActionM ()
-result = const $ return ()
+success :: (ToJSON a) => a -> ActionM ()
+success = const $ return ()
 
 -- TODO
-getUser :: ActionM (Maybe User)
-getUser = return Nothing
+failure :: Error -> ActionM ()
+failure = const $ return ()
 
 -- TODO
-setUser :: User -> ActionM ()
-setUser = const $ return ()
+getCookie :: ActionM (Maybe Cookie)
+getCookie = return Nothing
 
-runHandler :: Handler a -> a -> ActionM ()
+-- TODO
+setCookie :: Cookie -> ActionM ()
+setCookie = const $ return ()
+
+-- TODO
+makeSecret :: ActionM Secret
+makeSecret = return 0
+
+runHandler :: (FromJSON b, ToJSON c) => Handler a b c -> a -> ActionM ()
 runHandler h p = do
-  d <- param "data"
-  let j = parseJson d
-  case j of
-    Nothing -> result $ Left badData
-    Just j -> case h of
-      NoRequireAuth h -> result $ h p j
-      DoesAuth h -> case h p j of
-        (Left e) -> result $ Left e
-        (Right (u, r)) -> do
-          -- TODO make a secret and include it in the cookie
-          setUser u
-          -- TODO wrap r with a new secret
-          result $ Right r
-      RequireAuth h -> do
-        -- TODO unwrap the secret from the data and check it
-        u <- getUser
-        case u of
-          Nothing -> result $ Left badAuth
-          Just u -> result $ h u p j
+  (j :: b) <- jsonData
+  case h of
+    NoRequireAuth h -> result $ h p j
+    DoesAuth h -> case h p j of
+      (Left e) -> failure e
+      (Right (u, r)) -> do
+        s <- makeSecret
+        setCookie $ Cookie u s
+        result $ Right r
+    RequireAuth h -> do
+      c <- getCookie
+      case c of
+        Nothing -> failure badAuth
+        Just (Cookie u s) -> do
+          a <- param "secret"
+          if a == s
+          then result $ h u p j
+          else failure badSecret
 
-serve :: (forall a. (Target a, Handler a)) -> ScottyM ()
+serve :: (FromJSON b, ToJSON c) => (Target a, Handler a b c) -> ScottyM ()
 serve (target, handler) = runTarget target $ runHandler handler
-
-serveAll :: [forall a. (Target a, Handler a)] -> ScottyM ()
-serveAll = mapM_ serve
 

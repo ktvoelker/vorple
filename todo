@@ -2,8 +2,6 @@
 To-Do
 =====
 
-Add CSRF protection to the Comm library
-
 Implement stubs in the Comm library
 
 Add support for monadic actions in the Comm library
