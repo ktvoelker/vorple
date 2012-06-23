@@ -2,13 +2,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types #-}
 module Comm where
 
 import Control.Monad.Trans
 import Data.Aeson.Types
-import qualified Data.Text.Lazy as Text
+import qualified Data.ByteString.Char8 as BS
+import Data.List
+import Data.Maybe
+import qualified Data.Text.Lazy as T
 import GHC.Exts (fromString)
-import Network.HTTP.Types (Status(), unauthorized401)
+import Network.HTTP.Types (Status(), unauthorized401, StdMethod())
+import Network.Wai (requestHeaders)
 import System.Random
 import Web.Scotty
 
@@ -18,46 +23,55 @@ newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-data Method = Get | Post | Put | Delete deriving (Eq, Ord, Enum, Bounded, Show)
-
-data UrlPart a = Static String | Variable (String -> a -> a)
-
-data Target a = Target
-  { method      :: Method
-  , url         :: [UrlPart a]
-  , emptyParams :: a
-  }
-
--- TODO
-runTarget :: Target a -> (a -> ActionM ()) -> ScottyM ()
-runTarget _ _ = return ()
-
-data Handler a b c =
-    RequireAuth   (User -> a -> b -> IO c)
-  | DoesAuth      (a -> b -> IO (User, c))
-  | NoRequireAuth (a -> b -> IO c)
+data Handler a b =
+    RequireAuth   (User -> a -> IO b)
+  | DoesAuth      (a -> IO (User, b))
+  | NoRequireAuth (a -> IO b)
 
 result :: (ToJSON a) => IO a -> ActionM ()
 result r = liftIO r >>= json
 
--- TODO
--- Find a Cookie header in requestHeaders for the session key and parse out the body
+cookieMarker :: String
+cookieMarker = "session="
+
+cookieMarkerLength :: Int
+cookieMarkerLength = length cookieMarker
+
+readMaybe :: (Read a) => String -> Maybe a
+readMaybe xs = case reads xs of
+  ((a, "") : _) -> Just a
+  _ -> Nothing
+
 getCookie :: ActionM (Maybe Cookie)
-getCookie = return Nothing
+getCookie = do
+  r <- request
+  return
+    $ listToMaybe
+    $ take 1
+    $ catMaybes
+    $ map (readMaybe . drop cookieMarkerLength)
+    $ filter (cookieMarker `isPrefixOf`)
+    $ map (BS.unpack . snd)
+    $ filter ((== "Cookie") . fst)
+    $ requestHeaders r
 
 setCookie :: Cookie -> ActionM ()
-setCookie = header "Set-Cookie" . ("session=" `Text.append`) . fromString . show
+setCookie =
+  header "Set-Cookie"
+  . (fromString cookieMarker `T.append`)
+  . fromString
+  . show
 
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-runHandler :: (FromJSON b, ToJSON c) => Handler a b c -> a -> ActionM ()
-runHandler h p = do
+runHandler :: (FromJSON a, ToJSON b) => Handler a b -> ActionM ()
+runHandler h = do
   (j :: b) <- jsonData
   case h of
-    NoRequireAuth h -> result $ h p j
+    NoRequireAuth h -> result $ h j
     DoesAuth h -> do
-      (u, r) <- liftIO $ h p j
+      (u, r) <- liftIO $ h j
       s <- makeSecret
       setCookie $ Cookie u s
       json r
@@ -68,9 +82,11 @@ runHandler h p = do
         Just (Cookie u s) -> do
           a <- param "secret"
           if Secret a == s
-          then result $ h u p j
+          then result $ h u j
           else status unauthorized401
 
-serve :: (FromJSON b, ToJSON c) => (Target a, Handler a b c) -> ScottyM ()
-serve (target, handler) = runTarget target $ runHandler handler
+serve
+  :: (FromJSON a, ToJSON b)
+  => StdMethod -> RoutePattern -> Handler a b -> ScottyM ()
+serve method route handler = addroute method route $ runHandler handler
 
