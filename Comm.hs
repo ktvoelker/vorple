@@ -62,19 +62,22 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-noAuth :: (FromJSON a, ToJSON b) => (a -> M e b) -> M' e ()
-noAuth = (lift jsonData >>=) . (result .)
+maybeJsonData :: (FromJSON a) => M' e (Maybe a)
+maybeJsonData = lift $ rescue (jsonData >>= return . Just) (const $ return Nothing)
 
-doesAuth :: (FromJSON a, ToJSON b) => (a -> M e (User, b)) -> M' e ()
+noAuth :: (FromJSON a, ToJSON b) => (Maybe a -> M e b) -> M' e ()
+noAuth = (maybeJsonData >>=) . (result .)
+
+doesAuth :: (FromJSON a, ToJSON b) => (Maybe a -> M e (User, b)) -> M' e ()
 doesAuth h = do
-  (u, r) <- lift jsonData >>= mapReaderT liftIO . h
+  (u, r) <- maybeJsonData >>= mapReaderT liftIO . h
   lift $ do
     makeSecret >>= setCookie . Cookie u
     json r
 
-mustAuth :: (FromJSON a, ToJSON b) => (User -> a -> M e b) -> M' e ()
+mustAuth :: (FromJSON a, ToJSON b) => (User -> Maybe a -> M e b) -> M' e ()
 mustAuth h = do
-  j <- lift jsonData
+  j <- maybeJsonData
   c <- lift getCookie
   case c of
     Nothing -> lift $ status unauthorized401
