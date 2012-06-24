@@ -8,7 +8,7 @@ import Control.Monad
 import System.Environment
 import Web.Scotty
 
-import Comm
+import Vorple
 
 main = do
   args <- getArgs

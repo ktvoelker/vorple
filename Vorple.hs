@@ -6,7 +6,16 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Comm where
+module Vorple
+  ( MonadAction()
+  , EnvAdd(..)
+  , Vorple()
+  , mapEnv
+  , run
+  , withJson
+  , doesAuth
+  , mustAuth
+  ) where
 
 import Control.Monad.Error
 import Control.Monad.Reader
