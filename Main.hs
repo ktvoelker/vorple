@@ -4,10 +4,12 @@ module Main where
 
 import qualified Network.Wai.Handler.FastCGI as FastCGI
 
-import Control.Monad
+import Control.Monad.Reader
+import Database.HDBC.PostgreSQL
 import System.Environment
 import Web.Scotty
 
+import Types
 import Vorple
 
 main = do
@@ -17,7 +19,7 @@ main = do
       ["warp"] -> scotty 3000
       _ -> scottyApp >=> FastCGI.run
   }
-  runner $ do
-    get "/" $ do
-      html "<html><body><h1>Hello, world!</h1></body></html>"
+  conn <- connectPostgreSQL "dbname=test"
+  runner $ flip runReaderT (Env conn) $ do
+    serve (get "/") $ return ("Hello, world!" :: String)
 

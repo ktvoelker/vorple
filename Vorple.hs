@@ -11,6 +11,7 @@ module Vorple
   , EnvAdd(..)
   , Vorple()
   , mapEnv
+  , serve
   , run
   , param
   , withJson
@@ -67,6 +68,9 @@ newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
+
+serve :: (ToJSON a) => (ActionM () -> m ()) -> Vorple e a -> ReaderT e m ()
+serve f = mapReaderT f . run
 
 run :: (ToJSON a) => Vorple e a -> ReaderT e ActionM ()
 run = runErrorT . getv >=> lift . either status json
