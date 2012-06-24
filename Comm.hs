@@ -1,8 +1,8 @@
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 module Comm where
 
+import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.Aeson.Types
 import qualified Data.ByteString.Char8 as BS
@@ -15,14 +15,18 @@ import Network.Wai (requestHeaders)
 import System.Random
 import Web.Scotty
 
+type M e a = ReaderT e IO a
+
+type M' e a = ReaderT e ActionM a
+
 newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 
 newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-result :: (ToJSON a) => IO a -> ActionM ()
-result r = liftIO r >>= json
+result :: (ToJSON a) => M e a -> M' e ()
+result r = mapReaderT liftIO r >>= lift . json
 
 cookieMarker :: String
 cookieMarker = "session="
@@ -58,24 +62,25 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-noAuth :: (FromJSON a, ToJSON b) => (a -> IO b) -> ActionM ()
-noAuth = (jsonData >>=) . (result .)
+noAuth :: (FromJSON a, ToJSON b) => (a -> M e b) -> M' e ()
+noAuth = (lift jsonData >>=) . (result .)
 
-doesAuth :: (FromJSON a, ToJSON b) => (a -> IO (User, b)) -> ActionM ()
+doesAuth :: (FromJSON a, ToJSON b) => (a -> M e (User, b)) -> M' e ()
 doesAuth h = do
-  (u, r) <- jsonData >>= liftIO . h
-  makeSecret >>= setCookie . Cookie u
-  json r
+  (u, r) <- lift jsonData >>= mapReaderT liftIO . h
+  lift $ do
+    makeSecret >>= setCookie . Cookie u
+    json r
 
-mustAuth :: (FromJSON a, ToJSON b) => (User -> a -> IO b) -> ActionM ()
+mustAuth :: (FromJSON a, ToJSON b) => (User -> a -> M e b) -> M' e ()
 mustAuth h = do
-  j <- jsonData
-  c <- getCookie
+  j <- lift jsonData
+  c <- lift getCookie
   case c of
-    Nothing -> status unauthorized401
+    Nothing -> lift $ status unauthorized401
     Just (Cookie u s) -> do
-      a <- param "secret"
+      a <- lift $ param "secret"
       if Secret a == s
       then result $ h u j
-      else status unauthorized401
+      else lift $ status unauthorized401
 
