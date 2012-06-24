@@ -84,8 +84,7 @@ withJson
   -> ReaderT e m b
 withJson m = do
   j <- liftActionM jsonData
-  e <- ask
-  lift $ runReaderT m $ envAdd (j :: a) e
+  withReaderT (envAdd (j :: a)) m
 
 doesAuth :: (MonadAction m) => m (User, b) -> m b
 doesAuth m = do
@@ -104,6 +103,6 @@ mustAuth m = do
     Just (Cookie u s) -> do
       a <- liftActionM $ param "secret"
       if Secret a == s
-      then ask >>= lift . runReaderT m . envAdd u
+      then withReaderT (envAdd u) m
       else undefined --liftIO $ throw unauthorized401
 
