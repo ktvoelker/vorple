@@ -15,9 +15,14 @@ import Network.Wai (requestHeaders)
 import System.Random
 import Web.Scotty
 
-type M e a = ReaderT e IO a
+class ToActionM m where
+  toActionM :: m a -> ActionM a
 
-type M' e a = ReaderT e ActionM a
+instance ToActionM ActionM where
+  toActionM = id
+
+instance ToActionM IO where
+  toActionM = liftIO
 
 newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 
@@ -25,8 +30,8 @@ newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-result :: (ToJSON a) => M e a -> M' e ()
-result r = mapReaderT liftIO r >>= lift . json
+result :: (ToJSON a, ToActionM m) => ReaderT e m a -> ReaderT e ActionM ()
+result r = mapReaderT toActionM r >>= lift . json
 
 cookieMarker :: String
 cookieMarker = "session="
@@ -62,20 +67,29 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-maybeJsonData :: (FromJSON a) => M' e (Maybe a)
+maybeJsonData :: (FromJSON a) => ReaderT e ActionM (Maybe a)
 maybeJsonData = lift $ rescue (jsonData >>= return . Just) (const $ return Nothing)
 
-noAuth :: (FromJSON a, ToJSON b) => (Maybe a -> M e b) -> M' e ()
+noAuth
+  :: (FromJSON a, ToJSON b, ToActionM m)
+  => (Maybe a -> ReaderT e m b)
+  -> ReaderT e ActionM ()
 noAuth = (maybeJsonData >>=) . (result .)
 
-doesAuth :: (FromJSON a, ToJSON b) => (Maybe a -> M e (User, b)) -> M' e ()
+doesAuth
+  :: (FromJSON a, ToJSON b, ToActionM m)
+  => (Maybe a -> ReaderT e m (User, b))
+  -> ReaderT e ActionM ()
 doesAuth h = do
-  (u, r) <- maybeJsonData >>= mapReaderT liftIO . h
+  (u, r) <- maybeJsonData >>= mapReaderT toActionM . h
   lift $ do
     makeSecret >>= setCookie . Cookie u
     json r
 
-mustAuth :: (FromJSON a, ToJSON b) => (User -> Maybe a -> M e b) -> M' e ()
+mustAuth
+  :: (FromJSON a, ToJSON b, ToActionM m)
+  => (User -> Maybe a -> ReaderT e m b)
+  -> ReaderT e ActionM ()
 mustAuth h = do
   j <- maybeJsonData
   c <- lift getCookie
