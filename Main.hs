@@ -8,6 +8,8 @@ import Control.Monad
 import System.Environment
 import Web.Scotty
 
+import Comm
+
 main = do
   args <- getArgs
   let
