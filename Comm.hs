@@ -1,8 +1,6 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE Rank2Types #-}
 module Comm where
 
 import Control.Monad.Trans
@@ -22,11 +20,6 @@ newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
-
-data Handler a b =
-    RequireAuth   (User -> a -> IO b)
-  | DoesAuth      (a -> IO (User, b))
-  | NoRequireAuth (a -> IO b)
 
 result :: (ToJSON a) => IO a -> ActionM ()
 result r = liftIO r >>= json
@@ -65,28 +58,24 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-runHandler :: (FromJSON a, ToJSON b) => Handler a b -> ActionM ()
-runHandler h = do
-  (j :: b) <- jsonData
-  case h of
-    NoRequireAuth h -> result $ h j
-    DoesAuth h -> do
-      (u, r) <- liftIO $ h j
-      s <- makeSecret
-      setCookie $ Cookie u s
-      json r
-    RequireAuth h -> do
-      c <- getCookie
-      case c of
-        Nothing -> status unauthorized401
-        Just (Cookie u s) -> do
-          a <- param "secret"
-          if Secret a == s
-          then result $ h u j
-          else status unauthorized401
+noAuth :: (FromJSON a, ToJSON b) => (a -> IO b) -> ActionM ()
+noAuth = (jsonData >>=) . (result .)
 
-serve
-  :: (FromJSON a, ToJSON b)
-  => StdMethod -> RoutePattern -> Handler a b -> ScottyM ()
-serve method route handler = addroute method route $ runHandler handler
+doesAuth :: (FromJSON a, ToJSON b) => (a -> IO (User, b)) -> ActionM ()
+doesAuth h = do
+  (u, r) <- jsonData >>= liftIO . h
+  makeSecret >>= setCookie . Cookie u
+  json r
+
+mustAuth :: (FromJSON a, ToJSON b) => (User -> a -> IO b) -> ActionM ()
+mustAuth h = do
+  j <- jsonData
+  c <- getCookie
+  case c of
+    Nothing -> status unauthorized401
+    Just (Cookie u s) -> do
+      a <- param "secret"
+      if Secret a == s
+      then result $ h u j
+      else status unauthorized401
 
