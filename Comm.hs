@@ -1,9 +1,13 @@
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Comm where
 
+import Control.Monad.Error
 import Control.Monad.Reader
-import Control.Monad.Trans
 import Data.Aeson.Types
 import qualified Data.ByteString.Char8 as BS
 import Data.List
@@ -15,14 +19,20 @@ import Network.Wai (requestHeaders)
 import System.Random
 import Web.Scotty
 
-class ToActionM m where
-  toActionM :: m a -> ActionM a
+class (Monad m) => MonadAction m where
+  liftActionM :: ActionM a -> m a
 
-instance ToActionM ActionM where
-  toActionM = id
+instance MonadAction ActionM where
+  liftActionM = id
 
-instance ToActionM IO where
-  toActionM = liftIO
+instance (MonadAction m) => MonadAction (ReaderT e m) where
+  liftActionM = lift . liftActionM
+
+instance (Error e, MonadAction m) => MonadAction (ErrorT e m) where
+  liftActionM = lift . liftActionM
+
+class EnvAdd a e f | a e -> f where
+  envAdd :: a -> e -> f
 
 newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 
@@ -30,8 +40,9 @@ newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-result :: (ToJSON a, ToActionM m) => ReaderT e m a -> ReaderT e ActionM ()
-result r = mapReaderT toActionM r >>= lift . json
+-- TODO catch status exceptions
+run :: (ToJSON a, MonadAction m, MonadReader e m) => m a -> m ()
+run = (>>= liftActionM . json)
 
 cookieMarker :: String
 cookieMarker = "session="
@@ -67,37 +78,32 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-maybeJsonData :: (FromJSON a) => ReaderT e ActionM (Maybe a)
-maybeJsonData = lift $ rescue (jsonData >>= return . Just) (const $ return Nothing)
+withJson
+  :: forall a b e f m. (FromJSON a, EnvAdd a e f, MonadAction m)
+  => ReaderT f m b
+  -> ReaderT e m b
+withJson m = do
+  j <- liftActionM jsonData
+  e <- ask
+  lift $ runReaderT m $ envAdd (j :: a) e
 
-noAuth
-  :: (FromJSON a, ToJSON b, ToActionM m)
-  => (Maybe a -> ReaderT e m b)
-  -> ReaderT e ActionM ()
-noAuth = (maybeJsonData >>=) . (result .)
-
-doesAuth
-  :: (FromJSON a, ToJSON b, ToActionM m)
-  => (Maybe a -> ReaderT e m (User, b))
-  -> ReaderT e ActionM ()
-doesAuth h = do
-  (u, r) <- maybeJsonData >>= mapReaderT toActionM . h
-  lift $ do
-    makeSecret >>= setCookie . Cookie u
-    json r
+doesAuth :: (MonadAction m) => m (User, b) -> m b
+doesAuth m = do
+  (u, x) <- m
+  liftActionM $ makeSecret >>= setCookie . Cookie u
+  return x
 
 mustAuth
-  :: (FromJSON a, ToJSON b, ToActionM m)
-  => (User -> Maybe a -> ReaderT e m b)
-  -> ReaderT e ActionM ()
-mustAuth h = do
-  j <- maybeJsonData
-  c <- lift getCookie
+  :: (EnvAdd User e f, MonadAction m)
+  => ReaderT f m b
+  -> ReaderT e m b
+mustAuth m = do
+  c <- liftActionM getCookie
   case c of
-    Nothing -> lift $ status unauthorized401
+    Nothing -> undefined --liftIO $ throw unauthorized401
     Just (Cookie u s) -> do
-      a <- lift $ param "secret"
+      a <- liftActionM $ param "secret"
       if Secret a == s
-      then result $ h u j
-      else lift $ status unauthorized401
+      then ask >>= lift . runReaderT m . envAdd u
+      else undefined --liftIO $ throw unauthorized401
 
