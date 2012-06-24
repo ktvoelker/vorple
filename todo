@@ -2,15 +2,3 @@
 To-Do
 =====
 
-Standardize the types of noAuth, requireAuth, and doesAuth by moving all the
-extra parameter data into the environment, using Maybes as needed. Then all of
-these functions will be simple transformers: each one takes a monad and gives a
-monad, possibly wrapping in some logic that produces an updated environment for
-the wrapped monad.
-
-  Note that the env type may need to be changed in some cases. For example, different
-  handlers will want different target types for their incoming JSON.
-
-  These transformers should take in any ReaderT wrapping any ToActionM and should
-  produce a ReaderT wrapping an ActionM.
-
