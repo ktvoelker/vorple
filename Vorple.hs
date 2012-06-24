@@ -12,6 +12,7 @@ module Vorple
   , Vorple()
   , mapEnv
   , run
+  , param
   , withJson
   , doesAuth
   , mustAuth
@@ -28,7 +29,8 @@ import GHC.Exts (fromString)
 import Network.HTTP.Types (Status(), status500, status401, StdMethod())
 import Network.Wai (requestHeaders)
 import System.Random
-import Web.Scotty
+import Web.Scotty (ActionM, jsonData, header, request, json, status)
+import qualified Web.Scotty as S
 
 instance Error Status where
   noMsg = status500
@@ -66,8 +68,10 @@ newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-run :: (ToJSON a, MonadAction m, MonadError Status m) => m a -> m ()
-run = (`catchError` (liftActionM . status)) . (>>= liftActionM . json)
+run :: (ToJSON a) => Vorple e a -> ReaderT e ActionM ()
+run = runErrorT . getv >=> lift . either status json
+
+param = liftActionM . S.param
 
 cookieMarker :: String
 cookieMarker = "session="
