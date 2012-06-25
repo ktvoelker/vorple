@@ -8,18 +8,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Vorple
   ( MonadAction()
-  , EnvAdd(..)
   , Vorple()
-  , mapEnv
   , serve
   , run
   , param
   , jsonParam
   , parseJson
   , jsonData
-  , withJsonData
-  , doesAuth
-  , mustAuth
+  , setUser
+  , getUser
   ) where
 
 import Control.Monad.Error
@@ -32,7 +29,7 @@ import Data.List
 import Data.Maybe
 import qualified Data.Text.Lazy as T
 import GHC.Exts (fromString)
-import Network.HTTP.Types (Status(), status400, status401, status500, StdMethod())
+import Network.HTTP.Types (Status(), status400, status401, status500)
 import Network.Wai (requestHeaders)
 import System.Random
 import Web.Scotty (ActionM, header, request, json, status)
@@ -57,9 +54,6 @@ instance MonadReader e (Vorple e) where
 
 instance MonadIO (Vorple e) where
   liftIO = Vorple . liftIO
-
-class EnvAdd a e f | a e -> f where
-  envAdd :: a -> e -> f
 
 newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
 
@@ -120,31 +114,20 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-mapEnv :: (e -> f) -> Vorple f a -> Vorple e a
-mapEnv f = Vorple . mapErrorT (withReaderT f) . getv
-
 jsonData :: (FromJSON a) => Vorple e a
 jsonData = liftActionM S.jsonData
 
-withJsonData :: forall a b e f m. (FromJSON a, EnvAdd a e f) => Vorple f b -> Vorple e b
-withJsonData m = do
-  j <- liftActionM S.jsonData
-  mapEnv (envAdd (j :: a)) m
+setUser :: (MonadAction m) => User -> m ()
+setUser u = liftActionM $ makeSecret >>= setCookie . Cookie u
 
-doesAuth :: (MonadAction m) => m (User, b) -> m b
-doesAuth m = do
-  (u, x) <- m
-  liftActionM $ makeSecret >>= setCookie . Cookie u
-  return x
-
-mustAuth :: (EnvAdd User e f) => Vorple f b -> Vorple e b
-mustAuth m = do
+getUser :: Vorple e User
+getUser = do
   c <- liftActionM getCookie
   case c of
     Nothing -> throwError status401
     Just (Cookie u s) -> do
       a <- param "secret"
       if Secret a == s
-      then mapEnv (envAdd u) m
+      then return u
       else throwError status401
 
