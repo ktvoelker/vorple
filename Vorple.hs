@@ -14,39 +14,34 @@ module Vorple
   , serve
   , run
   , param
-  , withJson
+  , jsonParam
+  , parseJson
+  , jsonData
+  , withJsonData
   , doesAuth
   , mustAuth
   ) where
 
 import Control.Monad.Error
 import Control.Monad.Reader
+import qualified Data.Aeson as Ae
 import Data.Aeson.Types
+import qualified Data.Attoparsec as At
 import qualified Data.ByteString.Char8 as BS
 import Data.List
 import Data.Maybe
 import qualified Data.Text.Lazy as T
 import GHC.Exts (fromString)
-import Network.HTTP.Types (Status(), status500, status401, StdMethod())
+import Network.HTTP.Types (Status(), status400, status401, status500, StdMethod())
 import Network.Wai (requestHeaders)
 import System.Random
-import Web.Scotty (ActionM, jsonData, header, request, json, status)
+import Web.Scotty (ActionM, header, request, json, status)
 import qualified Web.Scotty as S
+
+import Vorple.Unsafe
 
 instance Error Status where
   noMsg = status500
-
-class (Monad m) => MonadAction m where
-  liftActionM :: ActionM a -> m a
-
-instance MonadAction ActionM where
-  liftActionM = id
-
-instance (MonadAction m) => MonadAction (ReaderT e m) where
-  liftActionM = lift . liftActionM
-
-instance (Error e, MonadAction m) => MonadAction (ErrorT e m) where
-  liftActionM = lift . liftActionM
 
 newtype Vorple e a = Vorple { getv :: ErrorT Status (ReaderT e ActionM) a }
   deriving (Monad, MonadAction)
@@ -59,6 +54,9 @@ instance MonadReader e (Vorple e) where
   ask = Vorple ask
   local f = Vorple . local f . getv
   reader = Vorple . reader
+
+instance MonadIO (Vorple e) where
+  liftIO = Vorple . liftIO
 
 class EnvAdd a e f | a e -> f where
   envAdd :: a -> e -> f
@@ -75,7 +73,18 @@ serve f = mapReaderT f . run
 run :: (ToJSON a) => Vorple e a -> ReaderT e ActionM ()
 run = runErrorT . getv >=> lift . either status json
 
-param = liftActionM . S.param
+param :: (S.Parsable a) => T.Text -> Vorple e a
+param = Vorple . lift . lift . S.param
+
+jsonParam :: forall a e. (FromJSON a) => T.Text -> Vorple e a
+jsonParam = (param :: T.Text -> Vorple e BS.ByteString) >=> parseJson
+
+parseJson :: forall a e. (FromJSON a) => BS.ByteString -> Vorple e a
+parseJson bs = case At.parse Ae.json bs :: At.Result Value of
+  At.Done "" r -> case fromJSON r of
+    Success r -> return r
+    _ -> throwError status400
+  _ -> throwError status400
 
 cookieMarker :: String
 cookieMarker = "session="
@@ -114,9 +123,12 @@ makeSecret = liftIO (getStdRandom random) >>= return . Secret
 mapEnv :: (e -> f) -> Vorple f a -> Vorple e a
 mapEnv f = Vorple . mapErrorT (withReaderT f) . getv
 
-withJson :: forall a b e f m. (FromJSON a, EnvAdd a e f) => Vorple f b -> Vorple e b
-withJson m = do
-  j <- liftActionM jsonData
+jsonData :: (FromJSON a) => Vorple e a
+jsonData = liftActionM S.jsonData
+
+withJsonData :: forall a b e f m. (FromJSON a, EnvAdd a e f) => Vorple f b -> Vorple e b
+withJsonData m = do
+  j <- liftActionM S.jsonData
   mapEnv (envAdd (j :: a)) m
 
 doesAuth :: (MonadAction m) => m (User, b) -> m b
@@ -131,7 +143,7 @@ mustAuth m = do
   case c of
     Nothing -> throwError status401
     Just (Cookie u s) -> do
-      a <- liftActionM $ param "secret"
+      a <- param "secret"
       if Secret a == s
       then mapEnv (envAdd u) m
       else throwError status401
