@@ -5,14 +5,21 @@ SOURCES=$(shell find . -name '*.hs')
 
 all: deploy
 
-deploy: test
-	cp test /srv/httpd/test/bin/
+deploy: bin/main bin/listen
+	cp bin/* /srv/httpd/test/bin/
 	cp -r static/* /srv/httpd/test/static/
 	apachectl graceful
 
-test: $(SOURCES)
-	ghc --make -o test $(SOURCES)
+bin/main: $(SOURCES)
+	mkdir -p bin
+	ghc --make -o bin/main Main
+
+bin/listen: $(SOURCES)
+	mkdir -p bin
+	ghc --make -main-is Listen -o bin/listen Listen
 
 clean:
-	-rm $(shell find . -name '*.o') $(shell find . -name '*.hi') test
+	-rm $(shell find . -name '*.o') $(shell find . -name '*.hi')
+	-rm bin/*
+	-rmdir bin
 

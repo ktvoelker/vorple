@@ -1,13 +1,12 @@
 
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module Listen where
 
 import Web.Scotty
 
-import Handlers
 import Server
 import Types
 import Vorple
 
-main = runServer $ serve (post "/munge") munge
+main = runServer $ return ()
 

@@ -1,7 +1,7 @@
 
 $(document).ready(function() {
   $("#send").click(function() {
-    $.ajax("/test/bin/test/munge", {
+    $.ajax("/test/bin/main/munge", {
       dataType: "json",
       contentType: "application/json",
       processData: false,
