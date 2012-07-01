@@ -9,6 +9,7 @@ module Server
 import qualified Network.Wai.Handler.FastCGI as FastCGI
 
 import Control.Monad.Reader
+import Data.Aeson.Types
 import Database.HDBC.PostgreSQL
 import System.Environment
 import Web.Scotty
@@ -16,16 +17,8 @@ import Web.Scotty
 import Types
 import Vorple
 
-runServer :: ReaderT Env ScottyM () -> IO ()
-runServer m = do
-  args <- getArgs
-  let
-  { runner = case args of
-      ["warp"] -> scotty 3000
-      _ -> scottyApp >=> FastCGI.run
-  }
+runServer :: (FromJSON a) => (a -> Vorple Env ()) -> IO ()
+runServer handler = do
   conn <- connectPostgreSQL "dbname=test"
-  runner
-    $ flip runReaderT (Env conn)
-    $ serve (get "/") (return ("Hello, world!" :: String)) >> m
+  run (Env conn) handler >>= FastCGI.run
 

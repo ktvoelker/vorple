@@ -9,12 +9,7 @@
 module Vorple
   ( MonadAction()
   , Vorple()
-  , serve
   , run
-  , param
-  , jsonParam
-  , parseJson
-  , jsonData
   , setUser
   , getUser
   ) where
@@ -29,11 +24,10 @@ import Data.List
 import Data.Maybe
 import qualified Data.Text.Lazy as T
 import GHC.Exts (fromString)
-import Network.HTTP.Types (Status(), status400, status401, status500)
-import Network.Wai (requestHeaders)
+import Network.HTTP.Types (Status(), status401, status500)
+import Network.Wai (requestHeaders, Application())
 import System.Random
-import Web.Scotty (ActionM, header, request, json, status)
-import qualified Web.Scotty as S
+import Web.Scotty
 
 import Vorple.Unsafe
 
@@ -61,24 +55,13 @@ newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-serve :: (ToJSON a) => (ActionM () -> m ()) -> Vorple e a -> ReaderT e m ()
-serve f = mapReaderT f . run
-
-run :: (ToJSON a) => Vorple e a -> ReaderT e ActionM ()
-run = runErrorT . getv >=> lift . either status json
-
-param :: (S.Parsable a) => T.Text -> Vorple e a
-param = Vorple . lift . lift . S.param
-
-jsonParam :: forall a e. (FromJSON a) => T.Text -> Vorple e a
-jsonParam = (param :: T.Text -> Vorple e BS.ByteString) >=> parseJson
-
-parseJson :: forall a e. (FromJSON a) => BS.ByteString -> Vorple e a
-parseJson bs = case At.parse Ae.json bs :: At.Result Value of
-  At.Done "" r -> case fromJSON r of
-    Success r -> return r
-    _ -> throwError status400
-  _ -> throwError status400
+run :: (FromJSON a, ToJSON b) => e -> (a -> Vorple e b) -> IO Application
+run env =
+  scottyApp
+  . post "/"
+  . flip runReaderT env
+  . (runErrorT . getv >=> lift . either status json)
+  . (liftActionM jsonData >>=)
 
 cookieMarker :: String
 cookieMarker = "session="
@@ -114,9 +97,6 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-jsonData :: (FromJSON a) => Vorple e a
-jsonData = liftActionM S.jsonData
-
 setUser :: (MonadAction m) => User -> m ()
 setUser u = liftActionM $ makeSecret >>= setCookie . Cookie u
 
@@ -126,7 +106,7 @@ getUser = do
   case c of
     Nothing -> throwError status401
     Just (Cookie u s) -> do
-      a <- param "secret"
+      a <- liftActionM $ param "secret"
       if Secret a == s
       then return u
       else throwError status401

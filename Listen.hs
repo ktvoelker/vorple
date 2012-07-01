@@ -8,5 +8,5 @@ import Server
 import Types
 import Vorple
 
-main = runServer $ return ()
+main = runServer $ \() -> return ()
 

@@ -9,5 +9,5 @@ import Server
 import Types
 import Vorple
 
-main = runServer $ serve (post "/munge") munge
+main = runServer handle
 
