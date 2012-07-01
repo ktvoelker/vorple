@@ -9,7 +9,7 @@
 module Vorple
   ( MonadAction()
   , Vorple()
-  , run
+  , runVorple
   , setUser
   , getUser
   ) where
@@ -55,8 +55,8 @@ newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
 
 data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
 
-run :: (FromJSON a, ToJSON b) => e -> (a -> Vorple e b) -> IO Application
-run env =
+runVorple :: (FromJSON a, ToJSON b) => e -> (a -> Vorple e b) -> IO Application
+runVorple env =
   scottyApp
   . post "/"
   . flip runReaderT env

@@ -1,12 +1,9 @@
 
-{-# LANGUAGE OverloadedStrings #-}
 module Listen where
 
-import Web.Scotty
-
-import Server
+import Init
 import Types
 import Vorple
 
-main = runServer $ \() -> return ()
+main = run $ \() -> return ()
 

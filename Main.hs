@@ -1,13 +1,9 @@
 
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Web.Scotty
-
-import Handlers
-import Server
+import Init
 import Types
 import Vorple
 
-main = runServer handle
+main = run $ \() -> return ()
 
