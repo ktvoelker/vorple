@@ -12,6 +12,7 @@ module Vorple
   , runVorple
   , setUser
   , getUser
+  , throwError
   ) where
 
 import Control.Monad.Error
@@ -97,15 +98,15 @@ setCookie =
 makeSecret :: ActionM Secret
 makeSecret = liftIO (getStdRandom random) >>= return . Secret
 
-setUser :: (MonadAction m) => User -> m ()
-setUser u = liftActionM $ makeSecret >>= setCookie . Cookie u
+setUser :: (MonadAction m) => Int -> m ()
+setUser u = liftActionM $ makeSecret >>= setCookie . Cookie (User u)
 
-getUser :: Vorple e User
+getUser :: Vorple e Int
 getUser = do
   c <- liftActionM getCookie
   case c of
     Nothing -> throwError status401
-    Just (Cookie u s) -> do
+    Just (Cookie (User u) s) -> do
       a <- liftActionM $ param "secret"
       if Secret a == s
       then return u
