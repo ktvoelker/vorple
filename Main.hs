@@ -5,5 +5,5 @@ import Init
 import Types
 import Vorple
 
-main = run $ \() -> return ()
+main = run $ \() -> return "Hello, world!"
 

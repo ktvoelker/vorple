@@ -12,6 +12,6 @@ import Database.HDBC.PostgreSQL
 import Types
 import Vorple
 
-run :: (FromJSON a) => (a -> Vorple Env ()) -> IO ()
+run :: (FromJSON a, ToJSON b) => (a -> Vorple Env b) -> IO ()
 run h = connectPostgreSQL "dbname=test" >>= flip runVorple h . Env >>= FastCGI.run
 
