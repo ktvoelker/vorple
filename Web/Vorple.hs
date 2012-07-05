@@ -6,8 +6,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Vorple
+module Web.Vorple
   ( Vorple()
   , runVorple
   , throwError
@@ -20,9 +21,12 @@ import Control.Monad.State
 import qualified Data.Aeson as Ae
 import Data.Aeson.TH
 import Data.Aeson.Types
+import qualified Data.ByteString as BSW
+import qualified Data.ByteString.Base64 as B64
 -- import qualified Data.Attoparsec as At
--- import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8 as BSC
 -- import Data.List
+import Data.List.Split
 -- import Data.Maybe
 -- import qualified Data.Text.Lazy as T
 -- import GHC.Exts (fromString)
@@ -65,7 +69,37 @@ data Csrf a = Csrf
 
 $(deriveJSON (drop 4) ''Csrf)
 
--- TODO Read and Show instances of Hmac and Csrf types
+showsOctets :: [Octet] -> ShowS
+showsOctets = (++) . BSC.unpack . B64.encode . BSW.pack
+
+readsOctets :: ReadS [Octet]
+readsOctets xs = case B64.decode $ BSC.pack xs of
+  Left _   -> []
+  Right bs -> [(BSW.unpack bs, [])]
+
+separator :: String
+separator = ";"
+
+instance Show Hmac where
+  showsPrec _ Hmac{..} = showsOctets hmacSum . (separator ++) . showsOctets hmacData
+
+instance Read Hmac where
+  readsPrec _ xs = case splitOn xs separator of
+    [sum, dat] -> do
+      (sum', []) <- readsOctets sum
+      (dat', []) <- readsOctets dat
+      return $ (Hmac sum' dat', [])
+
+instance (Show a) => Show (Csrf a) where
+  showsPrec p Csrf{..} = showsPrec p csrfKey . (separator ++) . showsPrec p csrfData
+
+instance (Read a) => Read (Csrf a) where
+  readsPrec p xs = do
+    (key, xs') <- readsPrec p xs
+    let (ss, xs'') = splitAt (length separator) xs'
+    guard $ ss == separator
+    (dat, xs''') <- readsPrec p xs''
+    return (Csrf key dat, xs''')
 
 readMaybe :: (Read a) => String -> Maybe a
 readMaybe xs = case reads xs of

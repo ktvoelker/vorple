@@ -10,8 +10,11 @@ import qualified Network.Wai.Handler.FastCGI as FastCGI
 import Database.HDBC.PostgreSQL
 
 import Types
-import Vorple
+import Web.Vorple
 
-run :: (FromJSON a, ToJSON b) => (a -> Vorple Env b) -> IO ()
-run h = connectPostgreSQL "dbname=test" >>= flip runVorple h . Env >>= FastCGI.run
+run :: (FromJSON a, ToJSON b) => (a -> Vorple Env () b) -> IO ()
+run h =
+  connectPostgreSQL "dbname=test"
+  >>= flip (flip (runVorple []) ()) h . Env
+  >>= FastCGI.run
 

@@ -3,7 +3,7 @@ module Listen where
 
 import Init
 import Types
-import Vorple
+import Web.Vorple
 
 main = run $ \() -> return "Hello, world!"
 
