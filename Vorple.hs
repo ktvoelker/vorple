@@ -6,75 +6,97 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Vorple
-  ( MonadAction()
-  , Vorple()
+  ( Vorple()
   , runVorple
-  , setUser
-  , getUser
   , throwError
   ) where
 
+import Codec.Utils
 import Control.Monad.Error
 import Control.Monad.Reader
+import Control.Monad.State
 import qualified Data.Aeson as Ae
+import Data.Aeson.TH
 import Data.Aeson.Types
-import qualified Data.Attoparsec as At
-import qualified Data.ByteString.Char8 as BS
-import Data.List
-import Data.Maybe
-import qualified Data.Text.Lazy as T
-import GHC.Exts (fromString)
+-- import qualified Data.Attoparsec as At
+-- import qualified Data.ByteString.Char8 as BS
+-- import Data.List
+-- import Data.Maybe
+-- import qualified Data.Text.Lazy as T
+-- import GHC.Exts (fromString)
 import Network.HTTP.Types (Status(), status401, status500)
 import Network.Wai (requestHeaders, Application())
 import System.Random
-import Web.Scotty
-
-import Vorple.Unsafe
+import qualified Web.Scotty as WS
 
 instance Error Status where
   noMsg = status500
 
-newtype Vorple e a = Vorple { getv :: ErrorT Status (ReaderT e ActionM) a }
-  deriving (Monad, MonadAction)
+newtype Vorple e s a = Vorple { getv :: ErrorT Status (ReaderT e (StateT s IO)) a }
+  deriving (Monad)
 
-instance MonadError Status (Vorple e) where
+instance MonadError Status (Vorple e s) where
   throwError = Vorple . throwError
   catchError m f = Vorple $ getv m `catchError` (getv . f)
 
-instance MonadReader e (Vorple e) where
+instance MonadReader e (Vorple e s) where
   ask = Vorple ask
   local f = Vorple . local f . getv
   reader = Vorple . reader
 
-instance MonadIO (Vorple e) where
+instance MonadState s (Vorple e s) where
+  get = Vorple get
+  put = Vorple . put
+
+instance MonadIO (Vorple e s) where
   liftIO = Vorple . liftIO
 
-newtype User = User { userId :: Int } deriving (Eq, Ord, Read, Show)
+data Hmac = Hmac
+  { hmacSum  :: [Octet]
+  , hmacData :: [Octet]
+  }
 
-newtype Secret = Secret { secretValue :: Int } deriving (Eq, Ord, Read, Show)
+data Csrf a = Csrf
+  { csrfKey  :: Int
+  , csrfData :: a
+  }
 
-data Cookie = Cookie User Secret deriving (Eq, Ord, Read, Show)
+$(deriveJSON (drop 4) ''Csrf)
 
-runVorple :: (FromJSON a, ToJSON b) => e -> (a -> Vorple e b) -> IO Application
-runVorple env =
-  scottyApp
-  . post "/"
-  . flip runReaderT env
-  . (runErrorT . getv >=> lift . either status json)
-  . (liftActionM jsonData >>=)
-
-cookieMarker :: String
-cookieMarker = "session="
-
-cookieMarkerLength :: Int
-cookieMarkerLength = length cookieMarker
+-- TODO Read and Show instances of Hmac and Csrf types
 
 readMaybe :: (Read a) => String -> Maybe a
 readMaybe xs = case reads xs of
   ((a, "") : _) -> Just a
   _ -> Nothing
 
+runVorple
+  :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+  -- The secret application key
+  => [Octet]
+  -- The initial environmentn
+  -> e
+  -- The default session state
+  -> s
+  -- The request handler
+  -> (a -> Vorple e s b)
+  -- The application
+  -> IO Application
+runVorple appKey env emptySession handler = WS.scottyApp $ WS.post "/" $ do
+  input <- WS.jsonData
+  let error = getv $ handler input
+  let reader = runErrorT error
+  -- TODO: read the initial state from the cookie and write the result state back
+  -- TODO: check the CSRF key from the cookie against one wrapping the request
+  -- TODO: HMAC the session with the application key so we can trust it
+  -- TODO: before HMACing, wrap the data in a CSRF key
+  let state = runReaderT reader env
+  (response, nextSession) <- liftIO $ runStateT state emptySession
+  either WS.status WS.json response
+
+{-
 getCookie :: ActionM (Maybe Cookie)
 getCookie = do
   r <- request
@@ -111,4 +133,5 @@ getUser = do
       if Secret a == s
       then return u
       else throwError status401
+-}
 
