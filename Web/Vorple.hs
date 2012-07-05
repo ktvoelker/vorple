@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -16,6 +17,7 @@ module Web.Vorple
 
 import Codec.Utils
 import Control.Monad.Error
+import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Aeson as Ae
@@ -38,23 +40,23 @@ import qualified Web.Scotty as WS
 instance Error Status where
   noMsg = status500
 
-newtype Vorple e s a = Vorple { getv :: ErrorT Status (ReaderT e (StateT s IO)) a }
+newtype Vorple e s m a = Vorple { getv :: ErrorT Status (ReaderT e (StateT s m)) a }
   deriving (Monad)
 
-instance MonadError Status (Vorple e s) where
+instance (Monad m) => MonadError Status (Vorple e s m) where
   throwError = Vorple . throwError
   catchError m f = Vorple $ getv m `catchError` (getv . f)
 
-instance MonadReader e (Vorple e s) where
+instance (Monad m) => MonadReader e (Vorple e s m) where
   ask = Vorple ask
   local f = Vorple . local f . getv
   reader = Vorple . reader
 
-instance MonadState s (Vorple e s) where
+instance (Monad m) => MonadState s (Vorple e s m) where
   get = Vorple get
   put = Vorple . put
 
-instance MonadIO (Vorple e s) where
+instance (MonadIO m) => MonadIO (Vorple e s m) where
   liftIO = Vorple . liftIO
 
 data Hmac = Hmac
@@ -106,19 +108,27 @@ readMaybe xs = case reads xs of
   ((a, "") : _) -> Just a
   _ -> Nothing
 
-runVorple
-  :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+type RunVorple a e s m b =
   -- The secret application key
-  => [Octet]
+  [Octet]
   -- The initial environmentn
   -> e
   -- The default session state
   -> s
   -- The request handler
-  -> (a -> Vorple e s b)
+  -> (a -> Vorple e s m b)
   -- The application
   -> IO Application
-runVorple appKey env emptySession handler = WS.scottyApp $ WS.post "/" $ do
+
+type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+
+runVorple
+  :: RvCtx a e s m b
+  -- The runner for the inner monad
+  => (m (Either Status b, s) -> IO (Either Status b, s))
+  -- Everything else
+  -> RunVorple a e s m b
+runVorple runner appKey env emptySession handler = WS.scottyApp $ WS.post "/" $ do
   input <- WS.jsonData
   let error = getv $ handler input
   let reader = runErrorT error
@@ -127,8 +137,14 @@ runVorple appKey env emptySession handler = WS.scottyApp $ WS.post "/" $ do
   -- TODO: HMAC the session with the application key so we can trust it
   -- TODO: before HMACing, wrap the data in a CSRF key
   let state = runReaderT reader env
-  (response, nextSession) <- liftIO $ runStateT state emptySession
+  (response, nextSession) <- liftIO $ runner $ runStateT state emptySession
   either WS.status WS.json response
+
+runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b
+runVorpleIO = runVorple id
+
+runVorpleIdentity :: RvCtx a e s Identity b => RunVorple a e s Identity b
+runVorpleIdentity = runVorple $ return . runIdentity
 
 {-
 getCookie :: ActionM (Maybe Cookie)
