@@ -2,13 +2,11 @@
 To-Do
 =====
 
-Implement TODO items in runVorple
+Get the example app working again
 
 Transform the DB module into Web.Vorple.DB
 
   Make the functions work with any environment that is in the HasConn class
-
-Get the example app working again
 
 Make a Cabal file for Vorple
 

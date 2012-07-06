@@ -25,14 +25,15 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import qualified Data.ByteString as BSW
 import qualified Data.ByteString.Base64 as B64
--- import qualified Data.Attoparsec as At
 import qualified Data.ByteString.Char8 as BSC
--- import Data.List
+import qualified Data.ByteString.Lazy as BSL
+import Data.HMAC
+import Data.List
 import Data.List.Split
--- import Data.Maybe
--- import qualified Data.Text.Lazy as T
--- import GHC.Exts (fromString)
-import Network.HTTP.Types (Status(), status401, status500)
+import Data.Maybe
+import qualified Data.Text.Lazy as TL
+import GHC.Exts (fromString)
+import Network.HTTP.Types (Status(), status400, status401, status500)
 import Network.Wai (requestHeaders, Application())
 import System.Random
 import qualified Web.Scotty as WS
@@ -92,17 +93,6 @@ instance Read Hmac where
       (dat', []) <- readsOctets dat
       return $ (Hmac sum' dat', [])
 
-instance (Show a) => Show (Csrf a) where
-  showsPrec p Csrf{..} = showsPrec p csrfKey . (separator ++) . showsPrec p csrfData
-
-instance (Read a) => Read (Csrf a) where
-  readsPrec p xs = do
-    (key, xs') <- readsPrec p xs
-    let (ss, xs'') = splitAt (length separator) xs'
-    guard $ ss == separator
-    (dat, xs''') <- readsPrec p xs''
-    return (Csrf key dat, xs''')
-
 readMaybe :: (Read a) => String -> Maybe a
 readMaybe xs = case reads xs of
   ((a, "") : _) -> Just a
@@ -122,23 +112,59 @@ type RunVorple a e s m b =
 
 type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
 
+getCookie :: (FromJSON a) => [Octet] -> WS.ActionM (Maybe a)
+getCookie appKey = do
+  r <- WS.request
+  let hs = map (BSC.unpack . snd) $ filter ((== "Cookie") . fst) $ requestHeaders r
+  return $ do
+    hmac <- listToMaybe $ catMaybes $ map readMaybe hs
+    guard $ hmac_sha1 appKey (hmacData hmac) == hmacSum hmac
+    Ae.decode $ BSL.pack $ map fromIntegral $ hmacData hmac
+
+makeCookie :: (ToJSON a) => [Octet] -> a -> TL.Text
+makeCookie appKey dat =
+  fromString $ show $ Hmac (hmac_sha1 appKey hmacData) hmacData
+  where
+    hmacData = BSL.unpack $ Ae.encode dat
+
+setCookie :: TL.Text -> WS.ActionM ()
+setCookie = WS.header "Set-Cookie"
+
+type ActionM' a = ErrorT Status WS.ActionM a
+
+catcher :: (ToJSON a) => ActionM' a -> WS.ActionM ()
+catcher m = runErrorT m >>= either WS.status WS.json
+
+require :: Bool -> ActionM' ()
+require c = when (not c) $ throwError status400
+
+requireJust :: Maybe a -> ActionM' a
+requireJust = maybe (throwError status400) return
+
 runVorple
-  :: RvCtx a e s m b
+  :: forall a e s m b. RvCtx a e s m b
   -- The runner for the inner monad
   => (m (Either Status b, s) -> IO (Either Status b, s))
   -- Everything else
   -> RunVorple a e s m b
-runVorple runner appKey env emptySession handler = WS.scottyApp $ WS.post "/" $ do
-  input <- WS.jsonData
-  let error = getv $ handler input
-  let reader = runErrorT error
-  -- TODO: read the initial state from the cookie and write the result state back
-  -- TODO: check the CSRF key from the cookie against one wrapping the request
-  -- TODO: HMAC the session with the application key so we can trust it
-  -- TODO: before HMACing, wrap the data in a CSRF key
-  let state = runReaderT reader env
-  (response, nextSession) <- liftIO $ runner $ runStateT state emptySession
-  either WS.status WS.json response
+runVorple runner appKey env emptySession handler = WS.scottyApp $ do
+  WS.post "/init" $ catcher $ do
+    cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
+    require $ isNothing cookie
+    csrfKey <- liftIO $ getStdRandom random
+    lift $ setCookie $ makeCookie appKey $ Csrf csrfKey emptySession
+  WS.post "/" $ catcher $ do
+    input <- lift WS.jsonData
+    cookie <- lift (getCookie appKey) >>= requireJust
+    require $ csrfKey input == csrfKey cookie
+    let session = csrfData cookie
+    let error = getv $ handler $ csrfData input
+    let reader = runErrorT error
+    let state = runReaderT reader env
+    (response, nextSession) <- liftIO $ runner $ runStateT state session
+    when (session /= nextSession)
+      $ lift $ setCookie $ makeCookie appKey $ Csrf (csrfKey cookie) nextSession
+    ErrorT $ return response
 
 runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b
 runVorpleIO = runVorple id
