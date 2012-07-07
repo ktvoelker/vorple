@@ -15,6 +15,12 @@ module Web.Vorple
   , runVorpleIO
   , runVorpleIdentity
   , throwError
+  , ask
+  , asks
+  , get
+  , put
+  , modify
+  , liftIO
   ) where
 
 import Codec.Utils
@@ -94,6 +100,7 @@ instance Read Hmac where
       (sum', []) <- readsOctets sum
       (dat', []) <- readsOctets dat
       return $ (Hmac sum' dat', [])
+    _ -> mzero
 
 readMaybe :: (Read a) => String -> Maybe a
 readMaybe xs = case reads xs of

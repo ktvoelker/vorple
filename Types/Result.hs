@@ -6,6 +6,7 @@ import Data.Aeson.TH
 
 data Result =
   LoggedIn |
+  NotLoggedIn |
   Echo
   { number :: Int
   }

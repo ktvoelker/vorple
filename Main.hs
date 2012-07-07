@@ -1,10 +1,10 @@
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Data.Convertible (convert)
+import Database.PostgreSQL.Simple
 
-import qualified DB
 import Init
 import Types
 import qualified Types.Command as C
@@ -15,11 +15,13 @@ main = run $ \cmd -> case cmd of
   C.Echo{..} -> do
     return $ R.Echo number
   C.Login{..} -> do
-    sth <- DB.prepare
+    c <- asks conn
+    r <- liftIO $ query c
       "SELECT id FROM users WHERE email = ? AND password = CRYPT(?, password)"
-    DB.execute sth [convert email, convert password]
-    [id] <- DB.mustFetchRow sth
-    -- let id' = convert id
-    -- setUser id'
-    return R.LoggedIn
+      (email, password)
+    case r of
+      [Only id] -> do
+        modify $ \s -> s { user = Just id }
+        return R.LoggedIn
+      _ -> return R.NotLoggedIn
 
