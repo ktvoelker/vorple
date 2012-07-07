@@ -12,6 +12,8 @@
 {-# LANGUAGE TupleSections #-}
 module Web.Vorple
   ( Vorple()
+  , Options(..)
+  , defaultOptions
   , runVorple
   , runVorpleIO
   , runVorpleIdentity
@@ -53,12 +55,52 @@ import System.IO (hPutStr, stderr)
 import System.Random
 import qualified Web.Scotty as WS
 
+data Options = Options
+  -- Enable internal debug logging
+  { optDebug  :: Bool
+  -- The secret application key
+  , optAppKey :: Maybe [Octet]
+  } deriving (Eq, Ord, Read, Show)
+
+defaultOptions :: Options
+defaultOptions = Options
+  { optDebug  = False
+  , optAppKey = Nothing
+  }
+
+newtype OptionsT m a = OptionsT { getOptionsT :: ReaderT Options m a }
+
+instance (Monad m) => Monad (OptionsT m) where
+  return = OptionsT . return
+  OptionsT m >>= f = OptionsT $ m >>= getOptionsT . f
+  fail = OptionsT . fail
+
+instance MonadTrans OptionsT where
+  lift = OptionsT . lift
+
+instance (MonadIO m) => MonadIO (OptionsT m) where
+  liftIO = OptionsT . liftIO
+
+asksOpt :: (Monad m) => (Options -> a) -> Vorple e s m a
+asksOpt = Vorple . lift . lift . lift . lift . OptionsT . asks
+
 instance Error Status where
   noMsg = status500
 
-newtype Vorple e s m a = Vorple
-  { getv :: ErrorT Status (WriterT String (ReaderT e (StateT s m))) a }
-  deriving (Monad)
+data Vorple e s m a = Vorple
+  { getv :: ErrorT Status
+            (WriterT String
+            (ReaderT e
+            (StateT s
+            (OptionsT m)))) a }
+
+instance (Monad m) => Monad (Vorple e s m) where
+  return = Vorple . return
+  Vorple m >>= f = Vorple $ m >>= getv . f
+  fail = Vorple . fail
+
+instance MonadTrans (Vorple e s) where
+  lift = Vorple . lift . lift . lift . lift . lift
 
 instance (Monad m) => MonadError Status (Vorple e s m) where
   throwError     = Vorple . throwError
@@ -171,9 +213,9 @@ randomKey n = mapM (const $ getStdRandom random) [1 .. n]
 type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
 
 type RunVorple a e s m b =
-  -- The secret application key
-  Maybe [Octet]
-  -- The initial environmentn
+  -- Options
+  Options
+  -- The initial environment
   -> e
   -- The default session state
   -> s
@@ -188,8 +230,8 @@ runVorple
   => (m ((Either Status b, String), s) -> IO ((Either Status b, String), s))
   -- Everything else
   -> RunVorple a e s m b
-runVorple runner mAppKey env emptySession handler = WS.scottyApp $ do
-  appKey <- maybe (liftIO $ randomKey 32) return mAppKey
+runVorple runner opts env emptySession handler = WS.scottyApp $ do
+  appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   WS.post "/init" $ catcher $ do
     cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
     require $ isNothing cookie
@@ -204,7 +246,9 @@ runVorple runner mAppKey env emptySession handler = WS.scottyApp $ do
     let writer = runErrorT error
     let reader = runWriterT writer
     let state = runReaderT reader env
-    ((response, log), nextSession) <- liftIO $ runner $ runStateT state session
+    let optReader = getOptionsT $ runStateT state session
+    let inner = runReaderT optReader opts
+    ((response, log), nextSession) <- liftIO $ runner inner
     liftIO $ hPutStr stderr log
     when (session /= nextSession)
       $ lift $ setCookie $ makeCookie appKey $ Csrf (csrfKey cookie) nextSession
