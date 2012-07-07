@@ -12,6 +12,8 @@
 module Web.Vorple
   ( Vorple()
   , runVorple
+  , runVorpleIO
+  , runVorpleIdentity
   , throwError
   ) where
 
@@ -98,20 +100,6 @@ readMaybe xs = case reads xs of
   ((a, "") : _) -> Just a
   _ -> Nothing
 
-type RunVorple a e s m b =
-  -- The secret application key
-  [Octet]
-  -- The initial environmentn
-  -> e
-  -- The default session state
-  -> s
-  -- The request handler
-  -> (a -> Vorple e s m b)
-  -- The application
-  -> IO Application
-
-type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
-
 getCookie :: (FromJSON a) => [Octet] -> WS.ActionM (Maybe a)
 getCookie appKey = do
   r <- WS.request
@@ -141,13 +129,31 @@ require c = when (not c) $ throwError status400
 requireJust :: Maybe a -> ActionM' a
 requireJust = maybe (throwError status400) return
 
+randomKey :: Int -> IO [Octet]
+randomKey n = mapM (const $ getStdRandom random) [1 .. n]
+
+type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+
+type RunVorple a e s m b =
+  -- The secret application key
+  Maybe [Octet]
+  -- The initial environmentn
+  -> e
+  -- The default session state
+  -> s
+  -- The request handler
+  -> (a -> Vorple e s m b)
+  -- The application
+  -> IO Application
+
 runVorple
   :: forall a e s m b. RvCtx a e s m b
   -- The runner for the inner monad
   => (m (Either Status b, s) -> IO (Either Status b, s))
   -- Everything else
   -> RunVorple a e s m b
-runVorple runner appKey env emptySession handler = WS.scottyApp $ do
+runVorple runner mAppKey env emptySession handler = WS.scottyApp $ do
+  appKey <- maybe (liftIO $ randomKey 32) return mAppKey
   WS.post "/init" $ catcher $ do
     cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
     require $ isNothing cookie
