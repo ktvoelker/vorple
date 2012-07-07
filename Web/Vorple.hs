@@ -51,7 +51,7 @@ import qualified Data.Text.Lazy as TL
 import GHC.Exts (fromString)
 import Network.HTTP.Types (Status(), status400, status401, status500)
 import Network.Wai (requestHeaders, Application())
-import System.IO (hPutStr, stderr)
+import System.IO (hPutStr, hPutStrLn, stderr)
 import System.Random
 import qualified Web.Scotty as WS
 
@@ -64,7 +64,7 @@ data Options = Options
 
 defaultOptions :: Options
 defaultOptions = Options
-  { optDebug  = False
+  { optDebug  = True
   , optAppKey = Nothing
   }
 
@@ -231,28 +231,43 @@ runVorple
   -- Everything else
   -> RunVorple a e s m b
 runVorple runner opts env emptySession handler = WS.scottyApp $ do
+  let
+  { debug :: (MonadIO i) => String -> i ()
+  ; debug = when (optDebug opts) . liftIO . hPutStrLn stderr
+  }
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
-  WS.post "/init" $ catcher $ do
-    cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
-    require $ isNothing cookie
-    csrfKey <- liftIO $ getStdRandom random
-    lift $ setCookie $ makeCookie appKey $ Csrf csrfKey emptySession
-  WS.post "/" $ catcher $ do
-    input <- lift WS.jsonData
-    cookie <- lift (getCookie appKey) >>= requireJust
-    require $ csrfKey input == csrfKey cookie
-    let session = csrfData cookie
-    let error = getv $ handler $ csrfData input
-    let writer = runErrorT error
-    let reader = runWriterT writer
-    let state = runReaderT reader env
-    let optReader = getOptionsT $ runStateT state session
-    let inner = runReaderT optReader opts
-    ((response, log), nextSession) <- liftIO $ runner inner
-    liftIO $ hPutStr stderr log
-    when (session /= nextSession)
-      $ lift $ setCookie $ makeCookie appKey $ Csrf (csrfKey cookie) nextSession
-    ErrorT $ return response
+  WS.post "/init" $ do
+    debug "Got request for /init"
+    catcher $ do
+      cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
+      require $ isNothing cookie
+      csrfKey <- liftIO $ getStdRandom random
+      lift $ setCookie $ makeCookie appKey $ Csrf csrfKey emptySession
+  WS.post "/" $ do
+    debug "Got request for /"
+    catcher $ do
+      debug "Inside the catcher"
+      lift WS.body >>= debug . map (chr . fromIntegral) . BSL.unpack
+      input <- lift WS.jsonData
+      debug "Got JSON data"
+      cookie <- lift (getCookie appKey) >>= requireJust
+      debug "Got cookie"
+      require $ csrfKey input == csrfKey cookie
+      debug "CSRF key matches"
+      let session = csrfData cookie
+      let error = getv $ handler $ csrfData input
+      let writer = runErrorT error
+      let reader = runWriterT writer
+      let state = runReaderT reader env
+      let optReader = getOptionsT $ runStateT state session
+      let inner = runReaderT optReader opts
+      ((response, log), nextSession) <- liftIO $ runner inner
+      debug "Ran request handler"
+      liftIO $ hPutStr stderr log
+      when (session /= nextSession)
+        $ lift $ setCookie $ makeCookie appKey $ Csrf (csrfKey cookie) nextSession
+      debug "About to return response"
+      ErrorT $ return response
 
 runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b
 runVorpleIO = runVorple id

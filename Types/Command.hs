@@ -11,7 +11,7 @@ data Command =
   } |
   Echo
   { number   :: Int
-  }
+  } deriving (Eq, Ord, Read, Show)
 
 $(deriveJSON id ''Command)
 
