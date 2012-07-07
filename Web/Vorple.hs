@@ -15,6 +15,9 @@ module Web.Vorple
   , runVorple
   , runVorpleIO
   , runVorpleIdentity
+  , logs
+  , logp
+  , logj
   , throwError
   , ask
   , asks
@@ -29,6 +32,7 @@ import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Writer
 import qualified Data.Aeson as Ae
 import Data.Aeson.TH
 import Data.Aeson.Types
@@ -36,6 +40,7 @@ import qualified Data.ByteString as BSW
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy as BSL
+import Data.Char
 import Data.HMAC
 import Data.List
 import Data.List.Split
@@ -44,30 +49,47 @@ import qualified Data.Text.Lazy as TL
 import GHC.Exts (fromString)
 import Network.HTTP.Types (Status(), status400, status401, status500)
 import Network.Wai (requestHeaders, Application())
+import System.IO (hPutStr, stderr)
 import System.Random
 import qualified Web.Scotty as WS
 
 instance Error Status where
   noMsg = status500
 
-newtype Vorple e s m a = Vorple { getv :: ErrorT Status (ReaderT e (StateT s m)) a }
+newtype Vorple e s m a = Vorple
+  { getv :: ErrorT Status (WriterT String (ReaderT e (StateT s m))) a }
   deriving (Monad)
 
 instance (Monad m) => MonadError Status (Vorple e s m) where
-  throwError = Vorple . throwError
+  throwError     = Vorple . throwError
   catchError m f = Vorple $ getv m `catchError` (getv . f)
 
 instance (Monad m) => MonadReader e (Vorple e s m) where
-  ask = Vorple ask
+  ask     = Vorple ask
   local f = Vorple . local f . getv
-  reader = Vorple . reader
+  reader  = Vorple . reader
 
 instance (Monad m) => MonadState s (Vorple e s m) where
   get = Vorple get
   put = Vorple . put
 
+instance (Monad m) => MonadWriter String (Vorple e s m) where
+  writer = Vorple . writer
+  tell   = Vorple . tell
+  listen = Vorple . listen . getv
+  pass   = Vorple . pass . getv
+
 instance (MonadIO m) => MonadIO (Vorple e s m) where
   liftIO = Vorple . liftIO
+
+logs :: (Monad m) => String -> Vorple e s m ()
+logs = tell . (++ "\n")
+
+logp :: (Monad m, Show a) => a -> Vorple e s m ()
+logp = logs . show
+
+logj :: (Monad m, ToJSON a) => a -> Vorple e s m ()
+logj = logs . map (chr . fromIntegral) . BSL.unpack . Ae.encode
 
 data Hmac = Hmac
   { hmacSum  :: [Octet]
@@ -163,7 +185,7 @@ type RunVorple a e s m b =
 runVorple
   :: forall a e s m b. RvCtx a e s m b
   -- The runner for the inner monad
-  => (m (Either Status b, s) -> IO (Either Status b, s))
+  => (m ((Either Status b, String), s) -> IO ((Either Status b, String), s))
   -- Everything else
   -> RunVorple a e s m b
 runVorple runner mAppKey env emptySession handler = WS.scottyApp $ do
@@ -179,9 +201,11 @@ runVorple runner mAppKey env emptySession handler = WS.scottyApp $ do
     require $ csrfKey input == csrfKey cookie
     let session = csrfData cookie
     let error = getv $ handler $ csrfData input
-    let reader = runErrorT error
+    let writer = runErrorT error
+    let reader = runWriterT writer
     let state = runReaderT reader env
-    (response, nextSession) <- liftIO $ runner $ runStateT state session
+    ((response, log), nextSession) <- liftIO $ runner $ runStateT state session
+    liftIO $ hPutStr stderr log
     when (session /= nextSession)
       $ lift $ setCookie $ makeCookie appKey $ Csrf (csrfKey cookie) nextSession
     ErrorT $ return response
