@@ -2,12 +2,6 @@
 To-Do
 =====
 
-Get the example app working again
-
-Transform the DB module into Web.Vorple.DB
-
-  Make the functions work with any environment that is in the HasConn class
-
 Make a Cabal file for Vorple
 
 Get rid of Scotty

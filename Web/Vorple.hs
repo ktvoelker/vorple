@@ -9,6 +9,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 module Web.Vorple
   ( Vorple()
   , runVorple
@@ -88,17 +89,23 @@ readsOctets xs = case B64.decode $ BSC.pack xs of
   Left _   -> []
   Right bs -> [(BSW.unpack bs, [])]
 
+showsOctetChars :: [Octet] -> ShowS
+showsOctetChars = (++) . BSC.unpack . BSW.pack
+
+readsOctetChars :: ReadS [Octet]
+readsOctetChars = (: []) . (, []) . BSW.unpack . BSC.pack
+
 separator :: String
 separator = ";"
 
 instance Show Hmac where
-  showsPrec _ Hmac{..} = showsOctets hmacSum . (separator ++) . showsOctets hmacData
+  showsPrec _ Hmac{..} = showsOctets hmacSum . (separator ++) . showsOctetChars hmacData
 
 instance Read Hmac where
   readsPrec _ xs = case splitOn xs separator of
     [sum, dat] -> do
       (sum', []) <- readsOctets sum
-      (dat', []) <- readsOctets dat
+      (dat', []) <- readsOctetChars dat
       return $ (Hmac sum' dat', [])
     _ -> mzero
 
@@ -184,43 +191,4 @@ runVorpleIO = runVorple id
 
 runVorpleIdentity :: RvCtx a e s Identity b => RunVorple a e s Identity b
 runVorpleIdentity = runVorple $ return . runIdentity
-
-{-
-getCookie :: ActionM (Maybe Cookie)
-getCookie = do
-  r <- request
-  return
-    $ listToMaybe
-    $ take 1
-    $ catMaybes
-    $ map (readMaybe . drop cookieMarkerLength)
-    $ filter (cookieMarker `isPrefixOf`)
-    $ map (BS.unpack . snd)
-    $ filter ((== "Cookie") . fst)
-    $ requestHeaders r
-
-setCookie :: Cookie -> ActionM ()
-setCookie =
-  header "Set-Cookie"
-  . (fromString cookieMarker `T.append`)
-  . fromString
-  . show
-
-makeSecret :: ActionM Secret
-makeSecret = liftIO (getStdRandom random) >>= return . Secret
-
-setUser :: (MonadAction m) => Int -> m ()
-setUser u = liftActionM $ makeSecret >>= setCookie . Cookie (User u)
-
-getUser :: Vorple e Int
-getUser = do
-  c <- liftActionM getCookie
-  case c of
-    Nothing -> throwError status401
-    Just (Cookie (User u) s) -> do
-      a <- liftActionM $ param "secret"
-      if Secret a == s
-      then return u
-      else throwError status401
--}
 
