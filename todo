@@ -2,6 +2,10 @@
 To-Do
 =====
 
+Figure out what caused the proliferation of different text types, and reduce them
+
+Figure out what's wrong with cookies and CSRF keys
+
 Make a Cabal file for Vorple
 
 Get rid of Scotty
