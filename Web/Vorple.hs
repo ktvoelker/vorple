@@ -29,37 +29,28 @@ module Web.Vorple
   , liftIO
   ) where
 
-import Codec.Utils
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer
-import qualified Data.Aeson as Ae
-import Data.Aeson.TH
-import Data.Aeson.Types
-import qualified Data.ByteString as BSW
-import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Char8 as BSC
-import qualified Data.ByteString.Lazy as BSL
-import Data.Char
 import Data.HMAC
 import Data.List
 import Data.List.Split
 import Data.Maybe
-import qualified Data.Text.Lazy as TL
-import GHC.Exts (fromString)
 import Network.HTTP.Types (Status(), status400, status401, status500)
 import Network.Wai (requestHeaders, Application())
 import System.IO (hPutStr, hPutStrLn, stderr)
 import System.Random
 import qualified Web.Scotty as WS
 
+import Web.Vorple.Text
+
 data Options = Options
   -- Enable internal debug logging
   { optDebug  :: Bool
   -- The secret application key
-  , optAppKey :: Maybe [Octet]
+  , optAppKey :: Maybe [Word8]
   } deriving (Eq, Ord, Read, Show)
 
 defaultOptions :: Options
@@ -89,7 +80,7 @@ instance Error Status where
 
 data Vorple e s m a = Vorple
   { getv :: ErrorT Status
-            (WriterT String
+            (WriterT ByteString
             (ReaderT e
             (StateT s
             (OptionsT m)))) a }
@@ -131,15 +122,15 @@ logp :: (Monad m, Show a) => a -> Vorple e s m ()
 logp = logs . show
 
 logj :: (Monad m, ToJSON a) => a -> Vorple e s m ()
-logj = logs . map (chr . fromIntegral) . BSL.unpack . Ae.encode
+logj = logs . map (chr . fromIntegral) . unpackBytes . encodeJSON
 
 data Hmac = Hmac
-  { hmacSum  :: [Octet]
-  , hmacData :: [Octet]
+  { hmacSum  :: Base64
+  , hmacData :: ByteString
   }
 
 data Csrf a = Csrf
-  { csrfKey  :: Int
+  { csrfKey  :: Base64
   , csrfData :: a
   }
 
