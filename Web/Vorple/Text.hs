@@ -20,8 +20,6 @@ module Web.Vorple.Text
   , unpackBytes
   , Base64(..)
   , encodeBase64
-  , module T
-  , module BS
   ) where
 
 import Data.List

@@ -42,6 +42,9 @@ import Network.HTTP.Types (Status(), status400, status401, status500)
 import Network.Wai (requestHeaders, Application())
 import System.IO (hPutStr, hPutStrLn, stderr)
 import System.Random
+
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.Text.Lazy as T
 import qualified Web.Scotty as WS
 
 import Web.Vorple.Text
@@ -106,7 +109,7 @@ instance (Monad m) => MonadState s (Vorple e s m) where
   get = Vorple get
   put = Vorple . put
 
-instance (Monad m) => MonadWriter String (Vorple e s m) where
+instance (Monad m) => MonadWriter ByteString (Vorple e s m) where
   writer = Vorple . writer
   tell   = Vorple . tell
   listen = Vorple . listen . getv
@@ -145,30 +148,38 @@ cookiePrefix = "s="
 cookiePrefixBytes :: ByteString
 cookiePrefixBytes = encodeUtf8 cookiePrefix
 
+getHmacSum :: [Word8] -> Base64 -> ByteString -> Base64
+getHmacSum appKey csrfKey appDataBytes =
+  encodeBase64
+  $ hmac_sha1 appKey
+  $ unpackBytes
+  $ getBase64Bytes csrfKey `BS.append` appDataBytes
+
 getCookie :: (FromJSON a) => [Word8] -> WS.ActionM (Maybe a)
-getCookie appKey = return Nothing
-{-
+getCookie appKey = do
   r <- WS.request
   let
   { hs =
       map (BS.drop $ BS.length cookiePrefixBytes)
-      $ filter (BS.startsWith cookiePrefixBytes)
+      $ filter (cookiePrefixBytes `BS.isPrefixOf`)
+      $ map (BS.fromChunks . (: []) . snd)
       $ filter ((== "Cookie") . fst)
       $ requestHeaders r
   }
   return $ listToMaybe $ do
-    hmac <- catMaybes $ map decodeJSON hs
-    guard $ hmac_sha1 appKey (hmacData hmac) == hmacSum hmac
-    Ae.decode $ BSL.pack $ map fromIntegral $ hmacData hmac
--}
+    Cookie{..} <- catMaybes $ map decodeJSON hs
+    guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
+    maybeToList $ decodeJSON cAppData
 
-makeCookie :: (ToJSON a) => [Octet] -> a -> TL.Text
-makeCookie appKey dat =
-  fromString $ show $ Hmac (hmac_sha1 appKey hmacData) hmacData
+makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> Text
+makeCookie appKey csrfKey appData =
+  cookiePrefix
+  `T.append`
+  showJSON (Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes)
   where
-    hmacData = BSL.unpack $ Ae.encode dat
+    appDataBytes = encodeJSON appData
 
-setCookie :: TL.Text -> WS.ActionM ()
+setCookie :: Text -> WS.ActionM ()
 setCookie = WS.header "Set-Cookie"
 
 type ActionM' a = ErrorT Status WS.ActionM a
@@ -202,13 +213,17 @@ type RunVorple a e s m b =
 runVorple
   :: forall a e s m b. RvCtx a e s m b
   -- The runner for the inner monad
-  => (m ((Either Status b, String), s) -> IO ((Either Status b, String), s))
+  => (m ((Either Status b, ByteString), s) -> IO ((Either Status b, ByteString), s))
   -- Everything else
   -> RunVorple a e s m b
 runVorple runner opts env emptySession handler = WS.scottyApp $ do
   let
-  { debug :: (MonadIO i) => String -> i ()
-  ; debug = when (optDebug opts) . liftIO . hPutStrLn stderr
+  { debug :: (MonadIO i) => ByteString -> i ()
+  ; debug =
+      when (optDebug opts)
+      . liftIO
+      . (>> BS.hPutStr stderr "\n")
+      . BS.hPutStr stderr
   }
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   WS.post "/init" $ do
@@ -216,13 +231,13 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
     catcher $ do
       cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
       require $ isNothing cookie
-      csrfKey <- liftIO $ getStdRandom random
-      lift $ setCookie $ makeCookie appKey $ Csrf csrfKey emptySession
+      csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
+      lift $ setCookie $ makeCookie appKey csrfKey emptySession
   WS.post "/" $ do
     debug "Got request for /"
     catcher $ do
       debug "Inside the catcher"
-      lift WS.body >>= debug . map (chr . fromIntegral) . BSL.unpack
+      lift WS.body >>= debug
       input <- lift WS.jsonData
       debug "Got JSON data"
       cookie <- lift (getCookie appKey) >>= requireJust
@@ -238,9 +253,9 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
       let inner = runReaderT optReader opts
       ((response, log), nextSession) <- liftIO $ runner inner
       debug "Ran request handler"
-      liftIO $ hPutStr stderr log
+      liftIO $ BS.hPutStr stderr log
       when (session /= nextSession)
-        $ lift $ setCookie $ makeCookie appKey $ Csrf (csrfKey cookie) nextSession
+        $ lift $ setCookie $ makeCookie appKey (csrfKey cookie) nextSession
       debug "About to return response"
       ErrorT $ return response
 
