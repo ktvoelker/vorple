@@ -2,9 +2,7 @@
 To-Do
 =====
 
-Figure out what caused the proliferation of different text types, and reduce them
-
-Figure out what's wrong with cookies and CSRF keys
+Perform URL encoding and decoding on cookie values
 
 Make a Cabal file for Vorple
 

@@ -1,5 +1,8 @@
 
 $(document).ready(function() {
+  $("#reset").click(function() {
+    document.cookie = "";
+  });
   $("#init").click(function() {
     $.ajax("/test/bin/main/init", {
       type: 'POST',
