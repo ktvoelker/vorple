@@ -115,19 +115,21 @@ instance (Monad m) => MonadWriter String (Vorple e s m) where
 instance (MonadIO m) => MonadIO (Vorple e s m) where
   liftIO = Vorple . liftIO
 
-logs :: (Monad m) => String -> Vorple e s m ()
-logs = tell . (++ "\n")
+logs :: (Monad m) => Text -> Vorple e s m ()
+logs = (>> tell "\n") . tell . encodeUtf8
 
 logp :: (Monad m, Show a) => a -> Vorple e s m ()
-logp = logs . show
+logp = logs . packString . show
 
 logj :: (Monad m, ToJSON a) => a -> Vorple e s m ()
-logj = logs . map (chr . fromIntegral) . unpackBytes . encodeJSON
+logj = (>> tell "\n") . tell . encodeJSON
 
 data Hmac = Hmac
   { hmacSum  :: Base64
   , hmacData :: ByteString
   }
+
+$(deriveJSON (drop 4) ''Hmac)
 
 data Csrf a = Csrf
   { csrfKey  :: Base64
@@ -136,45 +138,24 @@ data Csrf a = Csrf
 
 $(deriveJSON (drop 4) ''Csrf)
 
-showsOctets :: [Octet] -> ShowS
-showsOctets = (++) . BSC.unpack . B64.encode . BSW.pack
+cookiePrefix :: Text
+cookiePrefix = "s="
 
-readsOctets :: ReadS [Octet]
-readsOctets xs = case B64.decode $ BSC.pack xs of
-  Left _   -> []
-  Right bs -> [(BSW.unpack bs, [])]
+cookiePrefixBytes :: ByteString
+cookiePrefixBytes = encodeUtf8 cookiePrefix
 
-showsOctetChars :: [Octet] -> ShowS
-showsOctetChars = (++) . BSC.unpack . BSW.pack
-
-readsOctetChars :: ReadS [Octet]
-readsOctetChars = (: []) . (, []) . BSW.unpack . BSC.pack
-
-separator :: String
-separator = ";"
-
-instance Show Hmac where
-  showsPrec _ Hmac{..} = showsOctets hmacSum . (separator ++) . showsOctetChars hmacData
-
-instance Read Hmac where
-  readsPrec _ xs = case splitOn xs separator of
-    [sum, dat] -> do
-      (sum', []) <- readsOctets sum
-      (dat', []) <- readsOctetChars dat
-      return $ (Hmac sum' dat', [])
-    _ -> mzero
-
-readMaybe :: (Read a) => String -> Maybe a
-readMaybe xs = case reads xs of
-  ((a, "") : _) -> Just a
-  _ -> Nothing
-
-getCookie :: (FromJSON a) => [Octet] -> WS.ActionM (Maybe a)
+getCookie :: (FromJSON a) => [Word8] -> WS.ActionM (Maybe a)
 getCookie appKey = do
   r <- WS.request
-  let hs = map (BSC.unpack . snd) $ filter ((== "Cookie") . fst) $ requestHeaders r
-  return $ do
-    hmac <- listToMaybe $ catMaybes $ map readMaybe hs
+  let
+  { hs =
+      map (BS.drop $ BS.length cookiePrefixBytes)
+      $ filter (BS.startsWith cookiePrefixBytes)
+      $ filter ((== "Cookie") . fst)
+      $ requestHeaders r
+  }
+  return $ listToMaybe $ do
+    hmac <- catMaybes $ map decodeJSON hs
     guard $ hmac_sha1 appKey (hmacData hmac) == hmacSum hmac
     Ae.decode $ BSL.pack $ map fromIntegral $ hmacData hmac
 
@@ -198,7 +179,7 @@ require c = when (not c) $ throwError status400
 requireJust :: Maybe a -> ActionM' a
 requireJust = maybe (throwError status400) return
 
-randomKey :: Int -> IO [Octet]
+randomKey :: Int -> IO [Word8]
 randomKey n = mapM (const $ getStdRandom random) [1 .. n]
 
 type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
