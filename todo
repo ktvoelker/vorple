@@ -2,9 +2,27 @@
 To-Do
 =====
 
-Perform URL encoding and decoding on cookie values
+Separate Vorple into two monad transformers
+  The outer transformer doesn't require anything app-specific but the options,
+  so most of the request handling can happen inside this monad.
+
+  The inner transformer is brought in once the session is available.
+    So it actually is just adding StateT
+
+  Don't expose this separation
+    Have two different newtype wrappers with a function that can lift
+    This will require some duplication of instances, but that's boring code anyway
+
+  Move the types in Web.Vorple.Types and the instances into Web.Vorple.Class
+
+Parse cookies properly
+  URL encoding and decoding
+  Support for multiple key-value pairs in the cookie string
+  Does Scotty or WAI already do this?
 
 Make a Cabal file for Vorple
 
-Get rid of Scotty
+Write tests
+
+Get rid of Scotty?
 

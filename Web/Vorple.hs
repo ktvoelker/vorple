@@ -10,6 +10,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Web.Vorple
   ( Vorple()
   , Options(..)
@@ -75,18 +76,27 @@ instance MonadTrans OptionsT where
 instance (MonadIO m) => MonadIO (OptionsT m) where
   liftIO = OptionsT . liftIO
 
+instance (MonadReader r m) => MonadReader r (OptionsT m) where
+  ask = lift ask
+  local f = OptionsT . mapReaderT (local f) . getOptionsT
+  reader = lift . reader
+
+instance (MonadState s m) => MonadState s (OptionsT m) where
+  get = lift get
+  put = lift . put
+
 asksOpt :: (Monad m) => (Options -> a) -> Vorple e s m a
-asksOpt = Vorple . lift . lift . lift . lift . OptionsT . asks
+asksOpt = Vorple . lift . lift . OptionsT . asks
 
 instance Error Status where
   noMsg = status500
 
-data Vorple e s m a = Vorple
+newtype Vorple e s m a = Vorple
   { getv :: ErrorT Status
             (WriterT ByteString
+            (OptionsT
             (ReaderT e
-            (StateT s
-            (OptionsT m)))) a }
+            (StateT s m)))) a }
 
 instance (Monad m) => Monad (Vorple e s m) where
   return = Vorple . return
@@ -247,10 +257,10 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
       session <- requireJust $ decodeJSON $ cAppData cookie
       let error = getv $ handler $ csrfData input
       let writer = runErrorT error
-      let reader = runWriterT writer
+      let optReader = getOptionsT $ runWriterT writer
+      let reader = runReaderT optReader opts
       let state = runReaderT reader env
-      let optReader = getOptionsT $ runStateT state session
-      let inner = runReaderT optReader opts
+      let inner = runStateT state session
       ((response, log), nextSession) <- liftIO $ runner inner
       debug "Ran request handler"
       liftIO $ BS.hPutStr stderr log
