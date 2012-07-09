@@ -229,7 +229,7 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
   WS.post "/init" $ do
     debug "Got request for /init"
     catcher $ do
-      cookie <- lift $ getCookie appKey :: ActionM' (Maybe (Csrf a))
+      cookie <- lift $ getCookie appKey :: ActionM' (Maybe Cookie)
       require $ isNothing cookie
       csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
       lift $ setCookie $ makeCookie appKey csrfKey emptySession
@@ -240,11 +240,11 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
       lift WS.body >>= debug
       input <- lift WS.jsonData
       debug "Got JSON data"
-      cookie <- lift (getCookie appKey) >>= requireJust
+      cookie <- lift (getCookie appKey :: WS.ActionM (Maybe Cookie)) >>= requireJust
       debug "Got cookie"
-      require $ csrfKey input == csrfKey cookie
+      require $ csrfKey input == cCsrfKey cookie
       debug "CSRF key matches"
-      let session = csrfData cookie
+      session <- requireJust $ decodeJSON $ cAppData cookie
       let error = getv $ handler $ csrfData input
       let writer = runErrorT error
       let reader = runWriterT writer
@@ -255,7 +255,10 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
       debug "Ran request handler"
       liftIO $ BS.hPutStr stderr log
       when (session /= nextSession)
-        $ lift $ setCookie $ makeCookie appKey (csrfKey cookie) nextSession
+        $ lift
+        $ setCookie
+        $ makeCookie appKey (cCsrfKey cookie)
+        $ encodeJSON nextSession
       debug "About to return response"
       ErrorT $ return response
 
