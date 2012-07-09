@@ -124,12 +124,13 @@ logp = logs . packString . show
 logj :: (Monad m, ToJSON a) => a -> Vorple e s m ()
 logj = (>> tell "\n") . tell . encodeJSON
 
-data Hmac = Hmac
-  { hmacSum  :: Base64
-  , hmacData :: ByteString
+data Cookie = Cookie
+  { cHmacSum :: Base64
+  , cCsrfKey :: Base64
+  , cAppData :: ByteString
   }
 
-$(deriveJSON (drop 4) ''Hmac)
+$(deriveJSON (drop 1) ''Cookie)
 
 data Csrf a = Csrf
   { csrfKey  :: Base64
@@ -145,7 +146,8 @@ cookiePrefixBytes :: ByteString
 cookiePrefixBytes = encodeUtf8 cookiePrefix
 
 getCookie :: (FromJSON a) => [Word8] -> WS.ActionM (Maybe a)
-getCookie appKey = do
+getCookie appKey = return Nothing
+{-
   r <- WS.request
   let
   { hs =
@@ -158,6 +160,7 @@ getCookie appKey = do
     hmac <- catMaybes $ map decodeJSON hs
     guard $ hmac_sha1 appKey (hmacData hmac) == hmacSum hmac
     Ae.decode $ BSL.pack $ map fromIntegral $ hmacData hmac
+-}
 
 makeCookie :: (ToJSON a) => [Octet] -> a -> TL.Text
 makeCookie appKey dat =

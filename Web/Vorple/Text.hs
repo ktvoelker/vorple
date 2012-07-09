@@ -83,14 +83,14 @@ packBytes = BS.pack
 unpackBytes :: ByteString -> [Word8]
 unpackBytes = BS.unpack
 
-newtype Base64 = Base64 { getBase64Text :: Text } deriving (Eq, Ord)
+newtype Base64 = Base64 { getBase64Bytes :: ByteString } deriving (Eq, Ord)
 
 instance ToJSON Base64 where
-  toJSON = toJSON . T.toStrict . getBase64Text
+  toJSON = toJSON . getBase64Bytes
 
 instance FromJSON Base64 where
-  parseJSON = fmap (Base64 . T.fromStrict) . parseJSON
+  parseJSON = fmap Base64 . parseJSON
 
 encodeBase64 :: [Word8] -> Base64
-encodeBase64 = Base64 . T.pack . B64.encode
+encodeBase64 = Base64 . encodeUtf8 . T.pack . B64.encode
 
