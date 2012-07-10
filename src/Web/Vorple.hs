@@ -6,6 +6,7 @@ module Web.Vorple
   , runVorple
   , runVorpleIO
   , runVorpleIdentity
+  , logb
   , logs
   , logp
   , logj
@@ -41,16 +42,16 @@ import Web.Vorple.Text
 import Web.Vorple.Types
 import Web.Vorple.Util
 
-asksOpt :: (Monad m) => (Options -> a) -> Vorple e s m a
-asksOpt = Vorple . lift . lift . OptionsT . asks
+logb :: (MonadWriter ByteString m) => ByteString -> m ()
+logb = (>> tell "\n") . tell
 
-logs :: (Monad m) => Text -> Vorple e s m ()
-logs = (>> tell "\n") . tell . encodeUtf8
+logs :: (MonadWriter ByteString m) => Text -> m ()
+logs = logb . encodeUtf8
 
-logp :: (Monad m, Show a) => a -> Vorple e s m ()
+logp :: (MonadWriter ByteString m, Show a) => a -> m ()
 logp = logs . packString . show
 
-logj :: (Monad m, ToJSON a) => a -> Vorple e s m ()
+logj :: (MonadWriter ByteString m, ToJSON a) => a -> m ()
 logj = (>> tell "\n") . tell . encodeJSON
 
 cookiePrefix :: Text
@@ -93,19 +94,25 @@ makeCookie appKey csrfKey appData =
 setCookie :: Text -> WS.ActionM ()
 setCookie = WS.header "Set-Cookie"
 
-type ActionM' a = ErrorT Status WS.ActionM a
-
-catcher :: (ToJSON a) => ActionM' a -> WS.ActionM ()
-catcher m = runErrorT m >>= either WS.status WS.json
-
-require :: Bool -> ActionM' ()
+require :: (MonadError Status m) => Bool -> m ()
 require c = when (not c) $ throwError status400
 
-requireJust :: Maybe a -> ActionM' a
+requireJust :: (MonadError Status m) => Maybe a -> m a
 requireJust = maybe (throwError status400) return
 
 randomKey :: Int -> IO [Word8]
 randomKey n = mapM (const $ getStdRandom random) [1 .. n]
+
+runInternalAction
+  :: (ToJSON a)
+  => Options
+  -> e
+  -> Internal e WS.ActionM a
+  -> WS.ActionM ()
+runInternalAction opts env internal = do
+  (result, log) <- runInternal internal opts env
+  liftIO $ BS.hPutStr stderr log
+  either WS.status WS.json result
 
 type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
 
@@ -124,54 +131,40 @@ type RunVorple a e s m b =
 runVorple
   :: forall a e s m b. RvCtx a e s m b
   -- The runner for the inner monad
-  => (m ((Either Status b, ByteString), s) -> IO ((Either Status b, ByteString), s))
+  => (m (Either Status (b, s), ByteString) -> IO (Either Status (b, s), ByteString))
   -- Everything else
   -> RunVorple a e s m b
 runVorple runner opts env emptySession handler = WS.scottyApp $ do
-  let
-  { debug :: (MonadIO i) => ByteString -> i ()
-  ; debug =
-      when (optDebug opts)
-      . liftIO
-      . (>> BS.hPutStr stderr "\n")
-      . BS.hPutStr stderr
-  }
+  let debug' = (when (optDebug opts) .)
+  let debug = debug' logs
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
-  WS.post "/init" $ do
+  WS.post "/init" $ runInternalAction opts env $ do
     debug "Got request for /init"
-    catcher $ do
-      cookie <- lift $ getCookie appKey :: ActionM' (Maybe Cookie)
-      require $ isNothing cookie
-      csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
-      lift $ setCookie $ makeCookie appKey csrfKey emptySession
-  WS.post "/" $ do
+    cookie <- lift $ (getCookie appKey :: WS.ActionM (Maybe Cookie))
+    require $ isNothing cookie
+    csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
+    lift $ setCookie $ makeCookie appKey csrfKey emptySession
+  WS.post "/" $ runInternalAction opts env $ do
     debug "Got request for /"
-    catcher $ do
-      debug "Inside the catcher"
-      lift WS.body >>= debug
-      input <- lift WS.jsonData
-      debug "Got JSON data"
-      cookie <- lift (getCookie appKey :: WS.ActionM (Maybe Cookie)) >>= requireJust
-      debug "Got cookie"
-      require $ csrfKey input == cCsrfKey cookie
-      debug "CSRF key matches"
-      session <- requireJust $ decodeJSON $ cAppData cookie
-      let error = getVorple $ handler $ csrfData input
-      let writer = runErrorT error
-      let optReader = getOptionsT $ runWriterT writer
-      let reader = runReaderT optReader opts
-      let state = runReaderT reader env
-      let inner = runStateT state session
-      ((response, log), nextSession) <- liftIO $ runner inner
-      debug "Ran request handler"
-      liftIO $ BS.hPutStr stderr log
-      when (session /= nextSession)
-        $ lift
-        $ setCookie
-        $ makeCookie appKey (cCsrfKey cookie)
-        $ encodeJSON nextSession
-      debug "About to return response"
-      ErrorT $ return response
+    lift WS.body >>= debug' logb
+    input <- lift WS.jsonData
+    debug "Got JSON data"
+    cookie <- lift (getCookie appKey :: WS.ActionM (Maybe Cookie)) >>= requireJust
+    debug "Got cookie"
+    require $ csrfKey input == cCsrfKey cookie
+    debug "CSRF key matches"
+    session <- requireJust $ decodeJSON $ cAppData cookie
+    (response, nextSession) <-
+      mapInternal (liftIO . runner)
+      $ runVorpleInternal (handler $ csrfData input) session
+    debug "Ran request handler"
+    when (session /= nextSession)
+      $ lift
+      $ setCookie
+      $ makeCookie appKey (cCsrfKey cookie)
+      $ encodeJSON nextSession
+    debug "About to return response"
+    return response
 
 runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b
 runVorpleIO = runVorple id

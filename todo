@@ -2,10 +2,6 @@
 To-Do
 =====
 
-Move request handling inside an Internal monad
-  -This will simplify logging in there
-  -Cookie-related functions should go into Internal, too
-
 Parse cookies properly
   URL encoding and decoding
   Support for multiple key-value pairs in the cookie string

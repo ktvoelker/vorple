@@ -29,3 +29,17 @@ runVorpleInternal m s = mapInternal f $ Internal $ getVorple m
         Left err -> (Left err, log)
         Right result -> (Right (result, state), log)
 
+runInternal
+  :: (Monad m)
+  => Internal e m a
+  -> Options
+  -> e
+  -> m (Either Status a, ByteString)
+runInternal internal opts env = inner
+  where
+    error = getInternal internal
+    writer = runErrorT error
+    optReader = getOptionsT $ runWriterT writer
+    reader = runReaderT optReader opts
+    inner = runReaderT reader env
+
