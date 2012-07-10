@@ -48,85 +48,13 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text.Lazy as T
 import qualified Web.Scotty as WS
 
+import Web.Vorple.Class
 import Web.Vorple.Text
-
-data Options = Options
-  -- Enable internal debug logging
-  { optDebug  :: Bool
-  -- The secret application key
-  , optAppKey :: Maybe [Word8]
-  } deriving (Eq, Ord, Read, Show)
-
-defaultOptions :: Options
-defaultOptions = Options
-  { optDebug  = True
-  , optAppKey = Nothing
-  }
-
-newtype OptionsT m a = OptionsT { getOptionsT :: ReaderT Options m a }
-
-instance (Monad m) => Monad (OptionsT m) where
-  return = OptionsT . return
-  OptionsT m >>= f = OptionsT $ m >>= getOptionsT . f
-  fail = OptionsT . fail
-
-instance MonadTrans OptionsT where
-  lift = OptionsT . lift
-
-instance (MonadIO m) => MonadIO (OptionsT m) where
-  liftIO = OptionsT . liftIO
-
-instance (MonadReader r m) => MonadReader r (OptionsT m) where
-  ask = lift ask
-  local f = OptionsT . mapReaderT (local f) . getOptionsT
-  reader = lift . reader
-
-instance (MonadState s m) => MonadState s (OptionsT m) where
-  get = lift get
-  put = lift . put
+import Web.Vorple.Types
+import Web.Vorple.Util
 
 asksOpt :: (Monad m) => (Options -> a) -> Vorple e s m a
 asksOpt = Vorple . lift . lift . OptionsT . asks
-
-instance Error Status where
-  noMsg = status500
-
-newtype Vorple e s m a = Vorple
-  { getv :: ErrorT Status
-            (WriterT ByteString
-            (OptionsT
-            (ReaderT e
-            (StateT s m)))) a }
-
-instance (Monad m) => Monad (Vorple e s m) where
-  return = Vorple . return
-  Vorple m >>= f = Vorple $ m >>= getv . f
-  fail = Vorple . fail
-
-instance MonadTrans (Vorple e s) where
-  lift = Vorple . lift . lift . lift . lift . lift
-
-instance (Monad m) => MonadError Status (Vorple e s m) where
-  throwError     = Vorple . throwError
-  catchError m f = Vorple $ getv m `catchError` (getv . f)
-
-instance (Monad m) => MonadReader e (Vorple e s m) where
-  ask     = Vorple ask
-  local f = Vorple . local f . getv
-  reader  = Vorple . reader
-
-instance (Monad m) => MonadState s (Vorple e s m) where
-  get = Vorple get
-  put = Vorple . put
-
-instance (Monad m) => MonadWriter ByteString (Vorple e s m) where
-  writer = Vorple . writer
-  tell   = Vorple . tell
-  listen = Vorple . listen . getv
-  pass   = Vorple . pass . getv
-
-instance (MonadIO m) => MonadIO (Vorple e s m) where
-  liftIO = Vorple . liftIO
 
 logs :: (Monad m) => Text -> Vorple e s m ()
 logs = (>> tell "\n") . tell . encodeUtf8
@@ -255,7 +183,7 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
       require $ csrfKey input == cCsrfKey cookie
       debug "CSRF key matches"
       session <- requireJust $ decodeJSON $ cAppData cookie
-      let error = getv $ handler $ csrfData input
+      let error = getVorple $ handler $ csrfData input
       let writer = runErrorT error
       let optReader = getOptionsT $ runWriterT writer
       let reader = runReaderT optReader opts
