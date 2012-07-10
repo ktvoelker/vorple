@@ -1,5 +1,4 @@
 
-{-# LANGUAGE TemplateHaskell #-}
 module Types where
 
 import Data.Aeson.TH

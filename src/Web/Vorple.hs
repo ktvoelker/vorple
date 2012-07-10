@@ -1,16 +1,4 @@
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Web.Vorple
   ( Vorple()
   , Options(..)
@@ -64,21 +52,6 @@ logp = logs . packString . show
 
 logj :: (Monad m, ToJSON a) => a -> Vorple e s m ()
 logj = (>> tell "\n") . tell . encodeJSON
-
-data Cookie = Cookie
-  { cHmacSum :: Base64
-  , cCsrfKey :: Base64
-  , cAppData :: ByteString
-  }
-
-$(deriveJSON (drop 1) ''Cookie)
-
-data Csrf a = Csrf
-  { csrfKey  :: Base64
-  , csrfData :: a
-  }
-
-$(deriveJSON (drop 4) ''Csrf)
 
 cookiePrefix :: Text
 cookiePrefix = "s="

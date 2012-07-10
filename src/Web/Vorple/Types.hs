@@ -1,4 +1,5 @@
 
+{-# LANGUAGE TemplateHaskell #-}
 module Web.Vorple.Types where
 
 import Control.Monad.Error
@@ -36,4 +37,19 @@ newtype Vorple e s m a = Vorple
             (OptionsT
             (ReaderT e
             (StateT s m)))) a }
+
+data Cookie = Cookie
+  { cHmacSum :: Base64
+  , cCsrfKey :: Base64
+  , cAppData :: ByteString
+  }
+
+$(deriveJSON (drop 1) ''Cookie)
+
+data Csrf a = Csrf
+  { csrfKey  :: Base64
+  , csrfData :: a
+  }
+
+$(deriveJSON (drop 4) ''Csrf)
 

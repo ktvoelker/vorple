@@ -1,5 +1,4 @@
 
-{-# LANGUAGE OverloadedStrings #-}
 module Init
   ( run
   ) where

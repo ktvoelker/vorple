@@ -1,25 +1,22 @@
 
-.PHONY: all deploy clean
+.PHONY: all configure build deploy clean
 
-SOURCES=$(shell find . -name '*.hs')
+TARGET=/srv/httpd/test
 
 all: deploy
 
-deploy: bin/main bin/listen
-	cp bin/* /srv/httpd/test/bin/
-	cp -r static/* /srv/httpd/test/static/
+deploy: build
+	cp dist/build/vorple-example-main/vorple-example-main $(TARGET)/bin/main
+	cp dist/build/vorple-example-listen/vorple-example-listen $(TARGET)/bin/listen
+	cp -r static/* $(TARGET)/static/
 	apachectl graceful
 
-bin/main: $(SOURCES)
-	mkdir -p bin
-	ghc --make -o bin/main Main
+configure:
+	cabal configure
 
-bin/listen: $(SOURCES)
-	mkdir -p bin
-	ghc --make -main-is Listen -o bin/listen Listen
+build: configure
+	cabal build
 
 clean:
-	-rm $(shell find . -name '*.o') $(shell find . -name '*.hi')
-	-rm bin/*
-	-rmdir bin
+	cabal clean
 

@@ -1,6 +1,4 @@
 
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Database.PostgreSQL.Simple

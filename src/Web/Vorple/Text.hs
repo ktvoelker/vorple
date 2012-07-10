@@ -1,5 +1,4 @@
 
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Web.Vorple.Text
   ( readMaybe
   , FromJSON(..)

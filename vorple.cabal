@@ -1,0 +1,87 @@
+
+name: vorple
+version: 0.0.0.1
+cabal-version: >= 1.10
+build-type: Simple
+license: GPL
+license-file: LICENSE
+copyright: (c) 2012 Karl Voelker
+stability: unstable
+homepage: https://github.com/ktvoelker/vorple
+maintainer: Karl Voelker <ktvoelker@gmail.com>
+synopsis: A simple, monadic web framework
+description: TODO
+category: Web
+author: Karl Voelker <ktvoelker@gmail.com>
+
+Library
+  build-depends:
+    base >= 3 && < 5,
+    split -any,
+    mtl -any,
+    template-haskell -any,
+    text -any,
+    bytestring -any,
+    dataenc -any,
+    Crypto -any,
+    random -any,
+    aeson -any,
+    attoparsec -any,
+    http-types -any,
+    wai -any,
+    scotty -any
+  exposed-modules: Web.Vorple
+  other-modules:
+    Web.Vorple.Class
+    Web.Vorple.Text
+    Web.Vorple.Types
+    Web.Vorple.Util
+  hs-source-dirs: src
+  default-language: Haskell2010
+  default-extensions:
+    OverloadedStrings
+    MultiParamTypeClasses
+    FunctionalDependencies
+    ScopedTypeVariables
+    FlexibleContexts
+    FlexibleInstances
+    ConstraintKinds
+    GeneralizedNewtypeDeriving
+    RecordWildCards
+    TupleSections
+    UndecidableInstances
+  other-extensions:
+    TemplateHaskell
+
+Executable vorple-example-main
+  hs-source-dirs: example
+  default-language: Haskell2010
+  main-is: Main.hs
+  build-depends:
+    base >= 3 && < 5,
+    mtl -any,
+    aeson -any,
+    postgresql-simple -any,
+    wai-handler-fastcgi -any,
+    vorple -any
+  default-extensions:
+    OverloadedStrings
+    RecordWildCards
+    TemplateHaskell
+
+Executable vorple-example-listen
+  hs-source-dirs: example
+  default-language: Haskell2010
+  main-is: Listen.hs
+  build-depends:
+    base >= 3 && < 5,
+    mtl -any,
+    aeson -any,
+    postgresql-simple -any,
+    wai-handler-fastcgi -any,
+    vorple -any
+  default-extensions:
+    OverloadedStrings
+    RecordWildCards
+    TemplateHaskell
+
