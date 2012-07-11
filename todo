@@ -7,8 +7,6 @@ Parse cookies properly
   Support for multiple key-value pairs in the cookie string
   Does Scotty or WAI already do this?
 
-Make a Cabal file for Vorple
-
 Write tests
 
 Get rid of Scotty?
