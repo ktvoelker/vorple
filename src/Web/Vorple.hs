@@ -54,6 +54,12 @@ logp = logs . packString . show
 logj :: (MonadWriter ByteString m, ToJSON a) => a -> m ()
 logj = (>> tell "\n") . tell . encodeJSON
 
+debug' :: (MonadWriter ByteString m, MonadOptions m) => m () -> m ()
+debug' = (asksOpt optDebug >>=) . flip when
+
+debug :: (MonadWriter ByteString m, MonadOptions m) => Text -> m ()
+debug = debug' . logs
+
 cookiePrefix :: Text
 cookiePrefix = "s="
 
@@ -67,9 +73,9 @@ getHmacSum appKey csrfKey appDataBytes =
   $ unpackBytes
   $ getBase64Bytes csrfKey `BS.append` appDataBytes
 
-getCookie :: (FromJSON a) => [Word8] -> WS.ActionM (Maybe a)
+getCookie :: [Word8] -> Internal e WS.ActionM (Maybe Cookie)
 getCookie appKey = do
-  r <- WS.request
+  r <- lift WS.request
   let
   { hs =
       map (BS.drop $ BS.length cookiePrefixBytes)
@@ -78,10 +84,24 @@ getCookie appKey = do
       $ filter ((== "Cookie") . fst)
       $ requestHeaders r
   }
+  debug "POSSIBLE COOKIES:"
+  mapM_ (debug' . logb) hs
+  let cookies = catMaybes $ map decodeJSON hs :: [Cookie]
+  debug "PARSED COOKIES:"
+  mapM_ (debug' . logj) cookies
+  let
+  { cookieSums =
+      map (\Cookie{..} -> getHmacSum appKey cCsrfKey cAppData == cHmacSum) cookies
+  }
+  debug "COOKIE SUMS ACCEPTED:"
+  mapM_ (debug' . logj) cookieSums
+  let cookieDataBytes = map cAppData cookies
+  debug "COOKIE APP DATA BYTES:"
+  mapM (debug' . logb) cookieDataBytes
   return $ listToMaybe $ do
-    Cookie{..} <- catMaybes $ map decodeJSON hs
+    c@Cookie{..} <- catMaybes $ map decodeJSON hs
     guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
-    maybeToList $ decodeJSON cAppData
+    return c
 
 makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> Text
 makeCookie appKey csrfKey appData =
@@ -135,21 +155,19 @@ runVorple
   -- Everything else
   -> RunVorple a e s m b
 runVorple runner opts env emptySession handler = WS.scottyApp $ do
-  let debug' = (when (optDebug opts) .)
-  let debug = debug' logs
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   WS.post "/init" $ runInternalAction opts env $ do
     debug "Got request for /init"
-    cookie <- lift $ (getCookie appKey :: WS.ActionM (Maybe Cookie))
+    cookie <- getCookie appKey
     require $ isNothing cookie
     csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
     lift $ setCookie $ makeCookie appKey csrfKey emptySession
   WS.post "/" $ runInternalAction opts env $ do
     debug "Got request for /"
-    lift WS.body >>= debug' logb
+    lift WS.body >>= debug' . logb
     input <- lift WS.jsonData
     debug "Got JSON data"
-    cookie <- lift (getCookie appKey :: WS.ActionM (Maybe Cookie)) >>= requireJust
+    cookie <- getCookie appKey >>= requireJust
     debug "Got cookie"
     require $ csrfKey input == cCsrfKey cookie
     debug "CSRF key matches"
