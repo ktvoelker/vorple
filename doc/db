@@ -1,0 +1,28 @@
+
+Databases
+=========
+
+Static typing of database queries is nice, but it would be nicer if it were really
+easy to use, which would mean a few things:
+
+  1. Just as much inference as Haskell itself
+  2. No super-complicated type magic that nobody can figure out
+
+Here's an idea:
+
+When you write a SELECT query, you pass it as an argument to a TH function. This,
+in turn, produces a function which does the query and casts the results to the expected
+types. It does this by connecting to the database at compile-time, creating the
+SELECT query as a view, and getting the result types from the view description.
+
+There's just one problem with this: NULL. Views don't tell you whether they might
+contain a NULL.
+
+
+So, how about this:
+
+You write a SELECT query using a DSL and pass that query to a TH function. Thus, the
+DSL doesn't have the types embedded in it. But, by having access to the structure of
+the query, we can perform NULL-inference by looking at the source tables for
+non-NULL constraints.
+

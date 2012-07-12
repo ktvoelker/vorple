@@ -2,10 +2,15 @@
 To-Do
 =====
 
+Make logging easier
+  Use TH to do printf-style logging, but with special primitives for Show and ToJSON
+
 Parse cookies properly
   URL encoding and decoding
   Support for multiple key-value pairs in the cookie string
   Does Scotty or WAI already do this?
+
+Add a DB module that ensures transactionality of requests
 
 Write tests
 
