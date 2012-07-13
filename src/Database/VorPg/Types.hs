@@ -30,13 +30,33 @@ data Rel =
 data Val =
     VInteger Integer
   | VString  String
+  | VBool    Bool
+  | VNull
   | VField   Name Name
   | VApply   Func [Val]
   deriving (Eq, Ord, Read, Show)
 
 data Func =
     FPlus
+  | FTimes
   | FMinus
+  | FNegate
+  | FAbs
+  | FSignum
+  | FDivide
+  | FAnd
+  | FOr
+  | FNot
+  | FEqual
+  | FNotEqual
+  | FLess
+  | FGreater
+  | FLessEq
+  | FGreaterEq
+  | FIsNull
+  | FNotNull
+  | FCount
   | FSum
+  | FMean
   deriving (Eq, Ord, Read, Show, Enum, Bounded)
 
