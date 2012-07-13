@@ -1,9 +1,12 @@
 
-.PHONY: all configure build deploy clean
+.PHONY: all configure build install deploy clean
 
 TARGET=/srv/httpd/test
 
-all: deploy
+all: install deploy
+
+install: build
+	cabal install
 
 deploy: build
 	cp dist/build/vorple-example-main/vorple-example-main $(TARGET)/bin/main

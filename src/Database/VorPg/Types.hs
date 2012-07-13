@@ -1,7 +1,7 @@
 
 module Database.VorPg.Types where
 
-newtype Name = Name String deriving (Eq, Ord, Read, Show)
+type Name = String
 
 data Stmt =
     Select Rel
@@ -10,14 +10,20 @@ data Stmt =
   | Delete Name Val
   deriving (Eq, Ord, Read, Show)
 
+data Join = Inner | Outer
+  deriving (Eq, Ord, Read, Show, Enum, Bounded)
+
+data Dir = Asc | Desc
+  deriving (Eq, Ord, Read, Show, Enum, Bounded)
+
 data Rel =
     RLiteral [[Val]]
   | RTable   Name
   | RFilter  Rel Val
-  | RJoin    Bool Rel Val Rel Bool
+  | RJoin    Join Rel Val Rel Join
   | RGroup   Rel [Val]
-  | ROrder   Rel [(Val, Bool)]
-  | RUnion   Rel
+  | ROrder   Rel [(Val, Dir)]
+  | RUnion   Rel Rel
   | RProject Rel [Val]
   deriving (Eq, Ord, Read, Show)
 
