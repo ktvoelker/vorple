@@ -39,6 +39,9 @@ Library
     Web.Vorple.Types
     Web.Vorple.Util
     Database.VorPg.Lang
+    Database.VorPg.Lang.Stmt
+    Database.VorPg.Lang.Val
+    Database.VorPg.Sql
     Database.VorPg.Types
   hs-source-dirs: src
   default-language: Haskell2010

@@ -1,7 +1,13 @@
 
 module Database.VorPg.Types where
 
-type Name = String
+import GHC.Exts (IsString(..))
+
+newtype Name = Name { getName :: String }
+  deriving (Eq, Ord, Read, Show)
+
+instance IsString Name where
+  fromString = Name
 
 data Stmt =
     Select Rel
@@ -17,14 +23,14 @@ data Dir = Asc | Desc
   deriving (Eq, Ord, Read, Show, Enum, Bounded)
 
 data Rel =
-    RLiteral [[Val]]
-  | RTable   Name
+    RLiteral [[Val]] (Maybe Name)
+  | RTable   Name (Maybe Name)
   | RFilter  Rel Val
   | RJoin    Join Rel Val Rel Join
   | RGroup   Rel [Val]
   | ROrder   Rel [(Val, Dir)]
   | RUnion   Rel Rel
-  | RProject Rel [Val]
+  | RProject Rel [(Name, Val)]
   deriving (Eq, Ord, Read, Show)
 
 data Val =

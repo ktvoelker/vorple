@@ -8,6 +8,7 @@ module Database.VorPg.Lang.Stmt
   , delete
   , from
   , values
+  , hereTable
   , table
   , join
   , restrict
@@ -39,8 +40,11 @@ data Binding = Name := Val
 
 infix 0 :=
 
+unbind :: Binding -> (Name, Val)
+unbind (n := v) = (n, v)
+
 update :: Name -> [Binding] -> Val -> Stmt
-update n bs = Update n $ map (\(n := v) -> (n, v)) bs
+update n = Update n . map unbind
 
 delete :: Name -> Val -> Stmt
 delete = Delete
@@ -49,9 +53,12 @@ from :: Rel -> RelM () -> Rel
 from r m = execState (getRelM m) r
 
 values :: [[Val]] -> Rel
-values = RLiteral
+values = flip RLiteral Nothing
 
-table :: Name -> Rel
+hereTable :: Name -> [[Val]] -> Rel
+hereTable = flip RLiteral . Just
+
+table :: Name -> Maybe Name -> Rel
 table = RTable
 
 join :: (MonadState Rel m) => Val -> Rel -> m ()
@@ -60,8 +67,8 @@ join v right = modify $ \left -> RJoin Inner left v right Inner
 restrict :: (MonadState Rel m) => Val -> m ()
 restrict = modify . flip RFilter
 
-project :: (MonadState Rel m) => [Val] -> m ()
-project = modify . flip RProject
+project :: (MonadState Rel m) => [Binding] -> m ()
+project = modify . flip RProject . map unbind
 
 group :: (MonadState Rel m) => [Val] -> m ()
 group = modify . flip RGroup
@@ -79,3 +86,4 @@ union :: Rel -> Rel -> Rel
 union = RUnion
 
 infixl 1 `union`
+
