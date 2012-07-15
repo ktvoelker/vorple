@@ -1,5 +1,4 @@
 
-{-# LANGUAGE TemplateHaskell #-}
 module Web.Vorple.Types where
 
 import Control.Monad.Error
@@ -9,6 +8,14 @@ import Control.Monad.Writer
 import Network.HTTP.Types (Status())
 
 import Web.Vorple.Text
+
+data LogLevel =
+    Critical
+  | Error
+  | Warning
+  | Info
+  | Debug
+  deriving (Eq, Ord, Read, Show, Enum, Bounded)
 
 data Options = Options
   -- Enable internal debug logging

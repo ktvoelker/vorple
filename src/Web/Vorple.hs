@@ -6,10 +6,6 @@ module Web.Vorple
   , runVorple
   , runVorpleIO
   , runVorpleIdentity
-  , logb
-  , logs
-  , logp
-  , logj
   , throwError
   , ask
   , asks
@@ -17,6 +13,7 @@ module Web.Vorple
   , put
   , modify
   , liftIO
+  , note
   ) where
 
 import Control.Monad.Error
@@ -38,27 +35,10 @@ import qualified Data.Text.Lazy as T
 import qualified Web.Scotty as WS
 
 import Web.Vorple.Class
+import Web.Vorple.Log
 import Web.Vorple.Text
 import Web.Vorple.Types
 import Web.Vorple.Util
-
-logb :: (MonadWriter ByteString m) => ByteString -> m ()
-logb = (>> tell "\n") . tell
-
-logs :: (MonadWriter ByteString m) => Text -> m ()
-logs = logb . encodeUtf8
-
-logp :: (MonadWriter ByteString m, Show a) => a -> m ()
-logp = logs . packString . show
-
-logj :: (MonadWriter ByteString m, ToJSON a) => a -> m ()
-logj = (>> tell "\n") . tell . encodeJSON
-
-debug' :: (MonadWriter ByteString m, MonadOptions m) => m () -> m ()
-debug' = (asksOpt optDebug >>=) . flip when
-
-debug :: (MonadWriter ByteString m, MonadOptions m) => Text -> m ()
-debug = debug' . logs
 
 cookiePrefix :: Text
 cookiePrefix = "s="
@@ -84,20 +64,20 @@ getCookie appKey = do
       $ filter ((== "Cookie") . fst)
       $ requestHeaders r
   }
-  debug "POSSIBLE COOKIES:"
-  mapM_ (debug' . logb) hs
+  $(note "@dPOSSIBLE COOKIES:")
+  mapM_ $(note "@d%b") hs
   let cookies = catMaybes $ map decodeJSON hs :: [Cookie]
-  debug "PARSED COOKIES:"
-  mapM_ (debug' . logj) cookies
+  $(note "@dPARSED COOKIES:")
+  mapM_ $(note "@d%j") cookies
   let
   { cookieSums =
       map (\Cookie{..} -> getHmacSum appKey cCsrfKey cAppData == cHmacSum) cookies
   }
-  debug "COOKIE SUMS ACCEPTED:"
-  mapM_ (debug' . logj) cookieSums
+  $(note "@dCOOKIE SUMS ACCEPTED:")
+  mapM_ $(note "@d%j") cookieSums
   let cookieDataBytes = map cAppData cookies
-  debug "COOKIE APP DATA BYTES:"
-  mapM (debug' . logb) cookieDataBytes
+  $(note "@dCOOKIE APP DATA BYTES:")
+  mapM $(note "@d%b") cookieDataBytes
   return $ listToMaybe $ do
     c@Cookie{..} <- catMaybes $ map decodeJSON hs
     guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
@@ -157,31 +137,31 @@ runVorple
 runVorple runner opts env emptySession handler = WS.scottyApp $ do
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   WS.post "/init" $ runInternalAction opts env $ do
-    debug "Got request for /init"
+    $(note "@dGot request for /init")
     cookie <- getCookie appKey
     require $ isNothing cookie
     csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
     lift $ setCookie $ makeCookie appKey csrfKey emptySession
   WS.post "/" $ runInternalAction opts env $ do
-    debug "Got request for /"
-    lift WS.body >>= debug' . logb
+    $(note "@dGot request for /")
+    lift WS.body >>= $(note "@d%b")
     input <- lift WS.jsonData
-    debug "Got JSON data"
+    $(note "@dGot JSON data")
     cookie <- getCookie appKey >>= requireJust
-    debug "Got cookie"
+    $(note "@dGot cookie")
     require $ csrfKey input == cCsrfKey cookie
-    debug "CSRF key matches"
+    $(note "@dCSRF key matches")
     session <- requireJust $ decodeJSON $ cAppData cookie
     (response, nextSession) <-
       mapInternal (liftIO . runner)
       $ runVorpleInternal (handler $ csrfData input) session
-    debug "Ran request handler"
+    $(note "@dRan request handler")
     when (session /= nextSession)
       $ lift
       $ setCookie
       $ makeCookie appKey (cCsrfKey cookie)
       $ encodeJSON nextSession
-    debug "About to return response"
+    $(note "@dAbout to return response")
     return response
 
 runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b

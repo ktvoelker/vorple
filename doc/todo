@@ -2,8 +2,9 @@
 To-Do
 =====
 
-Make logging easier
-  Use TH to do printf-style logging, but with special primitives for Show and ToJSON
+Make the printf-style logger compile faster
+  Assume more about the nature of control sequences
+  Get rid of the control sequences for log levels - use separate function names
 
 Parse cookies properly
   URL encoding and decoding
