@@ -15,19 +15,20 @@ data LogLevel =
   | Warning
   | Info
   | Debug
+  | VorpleDebug
   deriving (Eq, Ord, Read, Show, Enum, Bounded)
 
 data Options = Options
   -- Enable internal debug logging
-  { optDebug  :: Bool
+  { optLogLevel :: LogLevel
   -- The secret application key
-  , optAppKey :: Maybe [Word8]
+  , optAppKey   :: Maybe [Word8]
   } deriving (Eq, Ord, Read, Show)
 
 defaultOptions :: Options
 defaultOptions = Options
-  { optDebug  = True
-  , optAppKey = Nothing
+  { optLogLevel = VorpleDebug
+  , optAppKey   = Nothing
   }
 
 newtype OptionsT m a = OptionsT { getOptionsT :: ReaderT Options m a }

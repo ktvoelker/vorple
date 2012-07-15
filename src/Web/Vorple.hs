@@ -13,7 +13,11 @@ module Web.Vorple
   , put
   , modify
   , liftIO
-  , note
+  , debug
+  , info
+  , warn
+  , err
+  , crit
   ) where
 
 import Control.Monad.Error
@@ -64,20 +68,20 @@ getCookie appKey = do
       $ filter ((== "Cookie") . fst)
       $ requestHeaders r
   }
-  $(note "@dPOSSIBLE COOKIES:")
-  mapM_ $(note "@d%b") hs
+  $(say "POSSIBLE COOKIES:")
+  mapM_ $(say "%b") hs
   let cookies = catMaybes $ map decodeJSON hs :: [Cookie]
-  $(note "@dPARSED COOKIES:")
-  mapM_ $(note "@d%j") cookies
+  $(say "PARSED COOKIES:")
+  mapM_ $(say "%j") cookies
   let
   { cookieSums =
       map (\Cookie{..} -> getHmacSum appKey cCsrfKey cAppData == cHmacSum) cookies
   }
-  $(note "@dCOOKIE SUMS ACCEPTED:")
-  mapM_ $(note "@d%j") cookieSums
+  $(say "COOKIE SUMS ACCEPTED:")
+  mapM_ $(say "%j") cookieSums
   let cookieDataBytes = map cAppData cookies
-  $(note "@dCOOKIE APP DATA BYTES:")
-  mapM $(note "@d%b") cookieDataBytes
+  $(say "COOKIE APP DATA BYTES:")
+  mapM $(say "%b") cookieDataBytes
   return $ listToMaybe $ do
     c@Cookie{..} <- catMaybes $ map decodeJSON hs
     guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
@@ -137,31 +141,31 @@ runVorple
 runVorple runner opts env emptySession handler = WS.scottyApp $ do
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   WS.post "/init" $ runInternalAction opts env $ do
-    $(note "@dGot request for /init")
+    $(say "Got request for /init")
     cookie <- getCookie appKey
     require $ isNothing cookie
     csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
     lift $ setCookie $ makeCookie appKey csrfKey emptySession
   WS.post "/" $ runInternalAction opts env $ do
-    $(note "@dGot request for /")
-    lift WS.body >>= $(note "@d%b")
+    $(say "Got request for /")
+    lift WS.body >>= $(say "%b")
     input <- lift WS.jsonData
-    $(note "@dGot JSON data")
+    $(say "Got JSON data")
     cookie <- getCookie appKey >>= requireJust
-    $(note "@dGot cookie")
+    $(say "Got cookie")
     require $ csrfKey input == cCsrfKey cookie
-    $(note "@dCSRF key matches")
+    $(say "CSRF key matches")
     session <- requireJust $ decodeJSON $ cAppData cookie
     (response, nextSession) <-
       mapInternal (liftIO . runner)
       $ runVorpleInternal (handler $ csrfData input) session
-    $(note "@dRan request handler")
+    $(say "Ran request handler")
     when (session /= nextSession)
       $ lift
       $ setCookie
       $ makeCookie appKey (cCsrfKey cookie)
       $ encodeJSON nextSession
-    $(note "@dAbout to return response")
+    $(say "About to return response")
     return response
 
 runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b

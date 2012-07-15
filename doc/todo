@@ -2,10 +2,6 @@
 To-Do
 =====
 
-Make the printf-style logger compile faster
-  Assume more about the nature of control sequences
-  Get rid of the control sequences for log levels - use separate function names
-
 Parse cookies properly
   URL encoding and decoding
   Support for multiple key-value pairs in the cookie string
