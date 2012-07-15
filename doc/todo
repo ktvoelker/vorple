@@ -2,18 +2,6 @@
 To-Do
 =====
 
-Simplify the SQL DSL to mimic actual SQL much more closely
-  This will simplify serialization and type analysis
-
-Make a serializer to SQL for the Database DSL
-
-Add more aggregate and string functions to the DSL
-
-Make a TH function that type-checks the SQL against the tables and produces a function
-  that executes the query
-
-Add support for custom functions, for which a SQL type declaration must be given
-
 Make logging easier
   Use TH to do printf-style logging, but with special primitives for Show and ToJSON
 
