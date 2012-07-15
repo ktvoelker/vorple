@@ -162,7 +162,16 @@ emptySqlRel = SqlRel
   }
 
 makeSqlRel :: Rel -> State SqlRel ()
-makeSqlRel _ = undefined
+makeSqlRel (RTable name alias) = do
+  ft <- gets srFirstTable
+  case ft of
+    Nothing -> modify $ \sr -> sr { srFirstTable = Just $ SqlTable name alias }
+    Just _  -> error "Invalid!"
+makeSqlRel (RFilter rel val) = do
+  makeSqlRel rel
+  modify $ (\sr -> sr { srRestrict = case srRestrict sr of
+    Nothing   -> Just val
+    Just prev -> VApply FAnd [prev, val] })
 
 showsSelect :: Rel -> Builder -> Builder
 showsSelect r = showsSqlRel $ execState (makeSqlRel r) emptySqlRel

@@ -2,6 +2,9 @@
 To-Do
 =====
 
+Simplify the SQL DSL to mimic actual SQL much more closely
+  This will simplify serialization and type analysis
+
 Make a serializer to SQL for the Database DSL
 
 Add more aggregate and string functions to the DSL
