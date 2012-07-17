@@ -29,7 +29,7 @@ Library
     attoparsec -any,
     http-types -any,
     wai -any,
-    scotty -any
+    scotty >= 0.4.4
   exposed-modules:
     Web.Vorple
   other-modules:

@@ -1,0 +1,12 @@
+ConstraintKinds
+FlexibleContexts
+FlexibleInstances
+FunctionalDependencies
+GeneralizedNewtypeDeriving
+MultiParamTypeClasses
+OverloadedStrings
+RecordWildCards
+ScopedTypeVariables
+TemplateHaskell
+TupleSections
+UndecidableInstances
