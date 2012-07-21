@@ -6,6 +6,7 @@ TARGET=/srv/httpd/test
 all: install deploy
 
 install: build
+	cabal-dev ghc-pkg unregister vorple
 	cabal-dev install
 
 deploy: build

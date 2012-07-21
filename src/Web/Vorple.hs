@@ -89,14 +89,17 @@ getCookie appKey = do
 
 makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> Text
 makeCookie appKey csrfKey appData =
-  cookiePrefix
-  `T.append`
-  showJSON (Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes)
+  T.append cookiePrefix
+  $ decodeUtf8
+  $ encodeUrl
+  $ encodeUtf8
+  $ showJSON
+  $ Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes
   where
     appDataBytes = encodeJSON appData
 
 setCookie :: Text -> WS.ActionM ()
-setCookie = WS.header "Set-Cookie" . decodeUtf8 . encodeUrl . encodeUtf8
+setCookie = WS.header "Set-Cookie"
 
 require :: (MonadError Status m) => Bool -> m ()
 require c = when (not c) $ throwError status400
@@ -147,6 +150,7 @@ runVorple runner opts env emptySession handler = WS.scottyApp $ do
     csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
     lift $ setCookie $ makeCookie appKey csrfKey emptySession
   WS.post "/" $ runInternalAction opts env $ do
+    lift $ setCookie "foo=bar"
     $(say "Got request for /")
     lift WS.body >>= $(say "%b")
     input <- lift WS.jsonData

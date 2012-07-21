@@ -3,8 +3,14 @@ To-Do
 =====
 
 Support for multiple key-value pairs in the cookie string
+  Cookies are getting complicated enough to deserve their own library
+  Take input and output as ByteString
+
+Use a free monad to get IO out of both the Vorple core and the request handler
 
 Write tests
+
+Make sure that testing the application's handler is easy
 
 Get rid of Scotty?
 
