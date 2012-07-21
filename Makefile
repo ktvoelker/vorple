@@ -6,7 +6,7 @@ TARGET=/srv/httpd/test
 all: install deploy
 
 install: build
-	cabal install
+	cabal-dev install
 
 deploy: build
 	cp dist/build/vorple-example-main/vorple-example-main $(TARGET)/bin/main
@@ -15,11 +15,11 @@ deploy: build
 	apachectl graceful
 
 configure:
-	cabal configure
+	cabal-dev configure
 
 build: configure
-	cabal build
+	cabal-dev build
 
 clean:
-	cabal clean
+	cabal-dev clean
 

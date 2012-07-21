@@ -62,7 +62,7 @@ getCookie appKey = do
   r <- lift WS.request
   let
   { hs =
-      map (BS.drop $ BS.length cookiePrefixBytes)
+      map (BS.drop (BS.length cookiePrefixBytes))
       $ filter (cookiePrefixBytes `BS.isPrefixOf`)
       $ map (BS.fromChunks . (: []) . snd)
       $ filter ((== "Cookie") . fst)
@@ -70,7 +70,7 @@ getCookie appKey = do
   }
   $(say "POSSIBLE COOKIES:")
   mapM_ $(say "%b") hs
-  let cookies = catMaybes $ map decodeJSON hs :: [Cookie]
+  let cookies = catMaybes $ map (decodeUrl >=> decodeJSON) hs :: [Cookie]
   $(say "PARSED COOKIES:")
   mapM_ $(say "%j") cookies
   let
@@ -96,7 +96,7 @@ makeCookie appKey csrfKey appData =
     appDataBytes = encodeJSON appData
 
 setCookie :: Text -> WS.ActionM ()
-setCookie = WS.header "Set-Cookie"
+setCookie = WS.header "Set-Cookie" . decodeUtf8 . encodeUrl . encodeUtf8
 
 require :: (MonadError Status m) => Bool -> m ()
 require c = when (not c) $ throwError status400

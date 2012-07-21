@@ -19,6 +19,8 @@ module Web.Vorple.Text
   , unpackBytes
   , Base64(..)
   , encodeBase64
+  , encodeUrl
+  , decodeUrl
   ) where
 
 import Data.List
@@ -32,6 +34,7 @@ import Data.Text.Lazy.Encoding (encodeUtf8, decodeUtf8)
 import Data.Word (Word8)
 
 import qualified Codec.Binary.Base64Url as B64
+import qualified Codec.Binary.Url as UE
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Encode as JE
 import qualified Data.Attoparsec.ByteString as P
@@ -90,4 +93,10 @@ instance FromJSON Base64 where
 
 encodeBase64 :: [Word8] -> Base64
 encodeBase64 = Base64 . encodeUtf8 . T.pack . B64.encode
+
+encodeUrl :: ByteString -> ByteString
+encodeUrl = encodeUtf8 . packString . UE.encode . unpackBytes
+
+decodeUrl :: ByteString -> Maybe ByteString
+decodeUrl = fmap packBytes . UE.decode . unpackString . decodeUtf8
 

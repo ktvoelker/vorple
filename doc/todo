@@ -2,14 +2,11 @@
 To-Do
 =====
 
-Parse cookies properly
-  URL encoding and decoding
-  Support for multiple key-value pairs in the cookie string
-  Does Scotty or WAI already do this?
-
-Add a DB module that ensures transactionality of requests
+Support for multiple key-value pairs in the cookie string
 
 Write tests
 
 Get rid of Scotty?
+
+Add a DB module that ensures transactionality of requests
 
