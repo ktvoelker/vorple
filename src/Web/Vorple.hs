@@ -25,12 +25,10 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.HMAC
 import Data.List
-import Data.List.Split
 import Data.Maybe
 import Network.HTTP.Types (Status(), status400, status401, status500)
-import Network.Wai (requestHeaders, Application())
+import Network.Wai (Application())
 import System.IO (hPutStr, hPutStrLn, stderr)
 import System.Random
 
@@ -39,67 +37,11 @@ import qualified Data.Text.Lazy as T
 import qualified Web.Scotty as WS
 
 import Web.Vorple.Class
+import Web.Vorple.Cookie
 import Web.Vorple.Log
 import Web.Vorple.Text
 import Web.Vorple.Types
 import Web.Vorple.Util
-
-cookiePrefix :: Text
-cookiePrefix = "s="
-
-cookiePrefixBytes :: ByteString
-cookiePrefixBytes = encodeUtf8 cookiePrefix
-
-getHmacSum :: [Word8] -> Base64 -> ByteString -> Base64
-getHmacSum appKey csrfKey appDataBytes =
-  encodeBase64
-  $ hmac_sha1 appKey
-  $ unpackBytes
-  $ getBase64Bytes csrfKey `BS.append` appDataBytes
-
-getCookie :: [Word8] -> Internal e WS.ActionM (Maybe Cookie)
-getCookie appKey = do
-  r <- lift WS.request
-  let
-  { hs =
-      map (BS.drop (BS.length cookiePrefixBytes))
-      $ filter (cookiePrefixBytes `BS.isPrefixOf`)
-      $ map (BS.fromChunks . (: []) . snd)
-      $ filter ((== "Cookie") . fst)
-      $ requestHeaders r
-  }
-  $(say "POSSIBLE COOKIES:")
-  mapM_ $(say "%b") hs
-  let cookies = catMaybes $ map (decodeUrl >=> decodeJSON) hs :: [Cookie]
-  $(say "PARSED COOKIES:")
-  mapM_ $(say "%j") cookies
-  let
-  { cookieSums =
-      map (\Cookie{..} -> getHmacSum appKey cCsrfKey cAppData == cHmacSum) cookies
-  }
-  $(say "COOKIE SUMS ACCEPTED:")
-  mapM_ $(say "%j") cookieSums
-  let cookieDataBytes = map cAppData cookies
-  $(say "COOKIE APP DATA BYTES:")
-  mapM $(say "%b") cookieDataBytes
-  return $ listToMaybe $ do
-    c@Cookie{..} <- catMaybes $ map decodeJSON hs
-    guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
-    return c
-
-makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> Text
-makeCookie appKey csrfKey appData =
-  T.append cookiePrefix
-  $ decodeUtf8
-  $ encodeUrl
-  $ encodeUtf8
-  $ showJSON
-  $ Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes
-  where
-    appDataBytes = encodeJSON appData
-
-setCookie :: Text -> WS.ActionM ()
-setCookie = WS.header "Set-Cookie"
 
 require :: (MonadError Status m) => Bool -> m ()
 require c = when (not c) $ throwError status400

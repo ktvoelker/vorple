@@ -34,6 +34,7 @@ Library
     Web.Vorple
   other-modules:
     Web.Vorple.Class
+    Web.Vorple.Cookie
     Web.Vorple.Text
     Web.Vorple.Types
     Web.Vorple.Util
