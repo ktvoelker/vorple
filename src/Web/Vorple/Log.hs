@@ -33,8 +33,8 @@ encodeShowable :: (Show a) => a -> ByteString
 encodeShowable = encodeUtf8 . packString . show
 
 parseControls :: String -> [Either Name String]
-parseControls [] = []
-parseControls ('%' : []) = [Right "%"]
+parseControls [] = [Right "\n"]
+parseControls ('%' : []) = [Right "%\n"]
 parseControls ('%' : '%' : xs) = case spanLiterals xs of
   (ls, xs')   -> Right ('%' : ls) : parseControls xs'
 parseControls ('%' : c : xs) = case find ((== c) . fst) encoders of
@@ -54,7 +54,14 @@ note level xs = let cs = parseControls xs in do
   let vs = map snd $ lefts cs'
   -- TODO can we use foldr here, and perhaps avoid reversing vs?
   let body = foldl f [| return () |] cs'
-  let body' = [| asksOpt optLogLevel >>= \maxLevel -> if maxLevel >= $(conE level) then $body else return () |]
+  let
+  { body' =
+    [| do
+      { maxLevel <- asksOpt optLogLevel
+      ; if maxLevel >= $(conE level) then $body else return ()
+      }
+    |]
+  }
   foldl p body' $ reverse vs
   where
     -- Run a Control after another action
