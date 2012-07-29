@@ -3,7 +3,8 @@ module Web.Vorple.Cookie where
 
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text.Lazy as T
-import qualified Web.Scotty as WS
+import qualified Network.HTTP.Types as H
+import qualified Network.Wai as W
 
 import Control.Monad
 import Control.Monad.Trans
@@ -11,7 +12,6 @@ import Data.HMAC
 import Data.List
 import Data.List.Split
 import Data.Maybe
-import Network.Wai (requestHeaders)
 
 import Web.Vorple.Log
 import Web.Vorple.Text
@@ -35,16 +35,14 @@ semicolon = case unpackBytes $ encodeUtf8 ";" of
   [n] -> n
   _   -> undefined
 
-getCookie :: [Word8] -> Internal e WS.ActionM (Maybe Cookie)
-getCookie appKey = do
-  r <- lift WS.request
+getCookie :: [Word8] -> H.RequestHeaders -> Internal e IO (Maybe Cookie)
+getCookie appKey rs = do
   let
   { hs =
       map (BS.drop (BS.length cookiePrefixBytes))
       $ filter (cookiePrefixBytes `BS.isPrefixOf`)
       $ concatMap (BS.split semicolon . BS.fromChunks . (: []) . snd)
-      $ filter ((== "Cookie") . fst)
-      $ requestHeaders r
+      $ filter ((== "Cookie") . fst) rs
   }
   $(say "POSSIBLE COOKIES:")
   mapM_ $(say "%b") hs
@@ -65,9 +63,10 @@ getCookie appKey = do
     guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
     return c
 
-makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> Text
+makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> ByteString
 makeCookie appKey csrfKey appData =
-  T.append cookiePrefix
+  encodeUtf8
+  $ T.append cookiePrefix
   $ decodeUtf8
   $ encodeUrl
   $ encodeUtf8
@@ -76,6 +75,6 @@ makeCookie appKey csrfKey appData =
   where
     appDataBytes = encodeJSON appData
 
-setCookie :: Text -> WS.ActionM ()
-setCookie = WS.header "Set-Cookie"
+setCookie :: ByteString -> H.ResponseHeaders -> H.ResponseHeaders
+setCookie = (:) . ("Set-Cookie",) . strictBytes
 

@@ -2,11 +2,27 @@
 To-Do
 =====
 
+Figure out why the response is getting JSON-encoded twice
+
+Clean up the way we move text around
+* Try to generate cookies as directly into a strict ByteString as possible
+* Use Aeson to get a Builder for the response value
+* See if Aeson can directly accept the request source conduit
+* We should probably use Data.Conduit.Attoparsec
+
 Use a free monad to get IO out of both the Vorple core and the request handler
+* Allow for a custom user action data type and interpreter
+* Don't expose our internal action data type
+* Getting and setting cookies, getting parameters, and sending the response are
+  currently IO actions, but this actually quite silly. Maybe things look more sensible
+  with plain-old WAI. (They do.)
+* It could almost turn out that the internal core doesn't need IO at all, except that
+  we probably still want it for logging. So, that'll be quite the simple instruction
+  set.
+
+Write Haddock documentation
 
 Write tests
-
-Stop depending on Scotty
 
 Add a DB module that ensures transactionality of requests
 

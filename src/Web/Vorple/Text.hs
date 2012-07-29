@@ -6,6 +6,8 @@ module Web.Vorple.Text
   , deriveJSON
   , encodeJSON
   , decodeJSON
+  , decodeJSONSource
+  , sinkJSON
   , readJSON
   , showJSON
   , Text()
@@ -21,6 +23,12 @@ module Web.Vorple.Text
   , encodeBase64
   , encodeUrl
   , decodeUrl
+  , StrictByteString()
+  , strictBytes
+  , runResourceT
+  , ($=)
+  , (=$)
+  , ($$)
   ) where
 
 import Data.List
@@ -29,16 +37,22 @@ import Data.Maybe
 import Data.Aeson.TH (deriveJSON)
 import Data.Aeson.Types (ToJSON(..), FromJSON(..))
 import Data.ByteString.Lazy (ByteString())
+import Data.Conduit (runResourceT, ($=), (=$), ($$))
 import Data.Text.Lazy (Text())
 import Data.Text.Lazy.Encoding (encodeUtf8, decodeUtf8)
 import Data.Word (Word8)
+
+import qualified Data.ByteString
 
 import qualified Codec.Binary.Base64Url as B64
 import qualified Codec.Binary.Url as UE
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Encode as JE
+import qualified Data.Aeson.Types as JT
 import qualified Data.Attoparsec.ByteString as P
 import qualified Data.ByteString.Lazy as BS
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Attoparsec as CAP
 import qualified Data.Foldable as F
 import qualified Data.Monoid as M
 import qualified Data.Text.Encoding as ES
@@ -48,6 +62,8 @@ import qualified Data.Text.Lazy.Encoding as E
 import qualified Data.HMAC as HMAC
 import qualified GHC.Exts as X
 
+type StrictByteString = Data.ByteString.ByteString
+
 readMaybe :: (Read a) => String -> Maybe a
 readMaybe = listToMaybe . map fst . filter (null . snd) . readsPrec 0
 
@@ -56,6 +72,15 @@ encodeJSON = J.encode
 
 decodeJSON :: (FromJSON a) => ByteString -> Maybe a
 decodeJSON = J.decode
+
+decodeJSONSource
+  :: (FromJSON a, Monad m, Functor m, C.MonadThrow m)
+  => C.Source m StrictByteString
+  -> m (Maybe a)
+decodeJSONSource = fmap (JT.parseMaybe J.parseJSON) . ($$ sinkJSON)
+
+sinkJSON :: (C.MonadThrow m) => C.Sink StrictByteString m J.Value
+sinkJSON = CAP.sinkParser J.json
 
 showJSON :: (ToJSON a) => a -> Text
 showJSON = TB.toLazyText . JE.fromValue . J.toJSON
@@ -99,4 +124,7 @@ encodeUrl = encodeUtf8 . packString . UE.encode . unpackBytes
 
 decodeUrl :: ByteString -> Maybe ByteString
 decodeUrl = fmap packBytes . UE.decode . unpackString . decodeUtf8
+
+strictBytes :: ByteString -> StrictByteString
+strictBytes = Data.ByteString.concat . BS.toChunks
 

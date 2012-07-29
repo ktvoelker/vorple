@@ -19,6 +19,7 @@ Library
     base >= 3 && < 5,
     split -any,
     mtl -any,
+    operational -any,
     template-haskell -any,
     text -any,
     bytestring -any,
@@ -26,10 +27,11 @@ Library
     Crypto -any,
     random -any,
     aeson -any,
+    conduit -any,
     attoparsec -any,
+    attoparsec-conduit -any,
     http-types -any,
-    wai -any,
-    scotty >= 0.4.4
+    wai -any
   exposed-modules:
     Web.Vorple
   other-modules:
