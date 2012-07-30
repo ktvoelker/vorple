@@ -65,9 +65,7 @@ getCookie appKey rs = do
 
 makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> ByteString
 makeCookie appKey csrfKey appData =
-  encodeUtf8
-  $ T.append cookiePrefix
-  $ decodeUtf8
+  BS.append cookiePrefixBytes
   $ encodeUrl
   $ encodeUtf8
   $ showJSON
