@@ -6,9 +6,8 @@ module Web.Vorple.Text
   , deriveJSON
   , encodeJSON
   , decodeJSON
+  , encodeJSONBuilder
   , decodeJSONSource
-  , sinkJSON
-  , readJSON
   , showJSON
   , Text()
   , packString
@@ -25,10 +24,6 @@ module Web.Vorple.Text
   , decodeUrl
   , StrictByteString()
   , strictBytes
-  , runResourceT
-  , ($=)
-  , (=$)
-  , ($$)
   ) where
 
 import Data.List
@@ -37,13 +32,15 @@ import Data.Maybe
 import Data.Aeson.TH (deriveJSON)
 import Data.Aeson.Types (ToJSON(..), FromJSON(..))
 import Data.ByteString.Lazy (ByteString())
-import Data.Conduit (runResourceT, ($=), (=$), ($$))
+import Data.Conduit (($=), (=$), ($$))
 import Data.Text.Lazy (Text())
 import Data.Text.Lazy.Encoding (encodeUtf8, decodeUtf8)
 import Data.Word (Word8)
 
 import qualified Data.ByteString
 
+import qualified Blaze.ByteString.Builder as BB
+import qualified Blaze.ByteString.Builder.Char.Utf8 as BBU
 import qualified Codec.Binary.Base64Url as B64
 import qualified Codec.Binary.Url as UE
 import qualified Data.Aeson as J
@@ -73,28 +70,20 @@ encodeJSON = J.encode
 decodeJSON :: (FromJSON a) => ByteString -> Maybe a
 decodeJSON = J.decode
 
+encodeJSONBuilder :: (ToJSON a) => a -> BB.Builder
+encodeJSONBuilder = BBU.fromLazyText . showJSON
+
 decodeJSONSource
-  :: (FromJSON a, Monad m, Functor m, C.MonadThrow m)
-  => C.Source m StrictByteString
-  -> m (Maybe a)
-decodeJSONSource = fmap (JT.parseMaybe J.parseJSON) . ($$ sinkJSON)
+  :: (FromJSON a)
+  => C.Source (C.ResourceT IO) StrictByteString
+  -> IO (Maybe a)
+decodeJSONSource = C.runResourceT . fmap (JT.parseMaybe J.parseJSON) . ($$ sinkJSON)
 
 sinkJSON :: (C.MonadThrow m) => C.Sink StrictByteString m J.Value
 sinkJSON = CAP.sinkParser J.json
 
 showJSON :: (ToJSON a) => a -> Text
 showJSON = TB.toLazyText . JE.fromValue . J.toJSON
-
-readJSON :: (FromJSON a) => Text -> Maybe a
-readJSON xs = do
-  value <-
-    either (const Nothing) Just
-    $ P.parseOnly J.json
-    $ ES.encodeUtf8
-    $ T.toStrict xs
-  case J.fromJSON value of
-    J.Error _   -> Nothing
-    J.Success o -> Just o
 
 packString :: String -> Text
 packString = T.pack

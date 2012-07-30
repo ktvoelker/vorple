@@ -2,13 +2,8 @@
 To-Do
 =====
 
-Figure out why the response is getting JSON-encoded twice
-
 Clean up the way we move text around
 * Try to generate cookies as directly into a strict ByteString as possible
-* Use Aeson to get a Builder for the response value
-* See if Aeson can directly accept the request source conduit
-* We should probably use Data.Conduit.Attoparsec
 
 Use a free monad to get IO out of both the Vorple core and the request handler
 * Allow for a custom user action data type and interpreter

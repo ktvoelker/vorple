@@ -62,12 +62,12 @@ runInternalAction opts env internal = do
   BS.hPutStr stderr log
   let
   { (status, body, cookie) = case result of
-      Left status          -> (status, encodeJSON (), Nothing)
-      Right (body, cookie) -> (H.status200, encodeJSON body, cookie)
+      Left status          -> (status, encodeJSONBuilder (), Nothing)
+      Right (body, cookie) -> (H.status200, encodeJSONBuilder body, cookie)
   }
   let headers = maybe [] (flip setCookie []) cookie
   -- TODO use ResponseBuilder and go directly from JSON to Builder
-  return $ W.responseLBS status headers $ encodeJSON body
+  return $ W.ResponseBuilder status headers body
 
 type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
 
@@ -101,7 +101,7 @@ runVorple runner opts env emptySession handler req = do
       return ((), Just $ makeCookie appKey csrfKey emptySession)
     [] -> runInternalAction opts env $ do
       $(say "Got request for /")
-      maybeInput <- liftIO $ runResourceT $ decodeJSONSource $ W.requestBody req
+      maybeInput <- liftIO $ decodeJSONSource $ W.requestBody req
       input <- maybe (throwError H.status400) return maybeInput
       $(say "Got JSON data")
       cookie <- getCookie appKey (W.requestHeaders req) >>= requireJust

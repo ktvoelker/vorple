@@ -23,6 +23,7 @@ Library
     template-haskell -any,
     text -any,
     bytestring -any,
+    blaze-builder -any,
     dataenc -any,
     Crypto -any,
     random -any,
