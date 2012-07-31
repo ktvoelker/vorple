@@ -66,7 +66,6 @@ runInternalAction opts env internal = do
       Right (body, cookie) -> (H.status200, encodeJSONBuilder body, cookie)
   }
   let headers = maybe [] (flip setCookie []) cookie
-  -- TODO use ResponseBuilder and go directly from JSON to Builder
   return $ W.ResponseBuilder status headers body
 
 type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
@@ -91,7 +90,6 @@ runVorple
   -> RunVorple a e s m b
 runVorple runner opts env emptySession handler req = do
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
-  -- TODO ensure POST
   lift $ case W.pathInfo req of
     ["init"] -> runInternalAction opts env $ do
       $(say "Got request for /init")
