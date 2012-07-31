@@ -1,6 +1,8 @@
 
 module Web.Vorple
-  ( Vorple()
+  ( RvCtx
+  , RunVorple
+  , Vorple()
   , Options(..)
   , defaultOptions
   , runVorple
