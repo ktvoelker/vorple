@@ -5,6 +5,8 @@ To-Do
 Simplify things by saying that Internal is just Vorple with () as the state
 * Also get rid of MonadOptions, which would avoid exposing some ugly internal
   stuff in the Haddock documentation
+* We can probably also get rid of OptionsT and just have the options as a separate
+  field in the Vorple record
 
 Use a free monad to get IO out of both the Vorple core and the request handler
 * Since logging doesn't need IO, the Vorple internals don't need IO at all
