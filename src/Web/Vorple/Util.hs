@@ -18,14 +18,21 @@ mapStateT' f = mapStateT f'
 
 mapVorple
   :: (  StateT s m (Either Status a, ByteString)
-     -> StateT s' m' (Either Status a', ByteString)
+     -> StateT t n (Either Status b, ByteString)
      )
   -> Vorple e s m a
-  -> Vorple e s' m' a'
+  -> Vorple e t n b
 mapVorple f =
   Vorple
   . (mapErrorT . mapWriterT . mapOptionsT . mapReaderT) f
   . getVorple
+
+mapInternal
+  :: (Monad m, Monad n)
+  => (m (Either Status a, ByteString) -> n (Either Status b, ByteString))
+  -> Internal e m a
+  -> Internal e n b
+mapInternal = mapVorple . (lift .) . (. flip evalStateT ())
 
 liftInternal :: (Monad m) => Internal e m a -> Vorple e s m a
 liftInternal = mapVorple $ lift . flip evalStateT ()
