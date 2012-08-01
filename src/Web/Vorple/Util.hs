@@ -12,19 +12,31 @@ import Web.Vorple.Types
 
 mapOptionsT f = OptionsT . mapReaderT f . getOptionsT
 
-mapInternal f =
-  Internal
+mapStateT' f = mapStateT f'
+  where
+    f' (x, s) = (f x, s)
+
+mapVorple
+  :: (  StateT s m (Either Status a, ByteString)
+     -> StateT s' m' (Either Status a', ByteString)
+     )
+  -> Vorple e s m a
+  -> Vorple e s' m' a'
+mapVorple f =
+  Vorple
   . (mapErrorT . mapWriterT . mapOptionsT . mapReaderT) f
-  . getInternal
+  . getVorple
 
 liftInternal :: (Monad m) => Internal e m a -> Vorple e s m a
-liftInternal = Vorple . getInternal . mapInternal lift
+liftInternal = mapVorple $ lift . flip evalStateT ()
 
-runVorpleInternal :: (Monad m) => Vorple e s m a -> s -> Internal e m (a, s)
-runVorpleInternal m s = mapInternal f $ Internal $ getVorple m
+runVorpleInternal :: forall a e m s. (Monad m) => Vorple e s m a -> s -> Internal e m (a, s)
+runVorpleInternal m s = mapVorple f m
   where
+    f :: StateT s m (Either Status a, ByteString)
+      -> StateT () m (Either Status (a, s), ByteString)
     f m = do
-      ((result, log), state) <- runStateT m s
+      ((result, log), state) <- lift $ runStateT m s
       return $ case result of
         Left err -> (Left err, log)
         Right result -> (Right (result, state), log)
@@ -37,9 +49,9 @@ runInternal
   -> m (Either Status a, ByteString)
 runInternal internal opts env = inner
   where
-    error = getInternal internal
+    error = getVorple internal
     writer = runErrorT error
     optReader = getOptionsT $ runWriterT writer
     reader = runReaderT optReader opts
-    inner = runReaderT reader env
+    inner = flip evalStateT () $ runReaderT reader env
 

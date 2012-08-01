@@ -33,18 +33,14 @@ defaultOptions = Options
 
 newtype OptionsT m a = OptionsT { getOptionsT :: ReaderT Options m a }
 
-newtype Internal e m a = Internal
-  { getInternal :: ErrorT Status
-            (WriterT ByteString
-            (OptionsT
-            (ReaderT e m))) a }
-
 newtype Vorple e s m a = Vorple
   { getVorple :: ErrorT Status
             (WriterT ByteString
             (OptionsT
             (ReaderT e
             (StateT s m)))) a }
+
+type Internal e m a = Vorple e () m a
 
 data Cookie = Cookie
   { cHmacSum :: Base64
