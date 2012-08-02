@@ -1,8 +1,6 @@
 
 module Web.Vorple
-  ( RvCtx
-  , RunVorple
-  , Vorple()
+  ( Vorple()
   , Options(..)
   , defaultOptions
   , runVorple
@@ -54,7 +52,7 @@ randomKey :: Int -> IO [Word8]
 randomKey n = mapM (const $ getStdRandom random) [1 .. n]
 
 runInternalAction
-  :: forall a e. (ToJSON a)
+  :: (ToJSON a)
   => Options
   -> e
   -> Internal e IO (a, Maybe ByteString)
@@ -70,11 +68,12 @@ runInternalAction opts env internal = do
   let headers = maybe [] (flip setCookie []) cookie
   return $ W.ResponseBuilder status headers body
 
-type RvCtx a e s m b = (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
-
-type RunVorple a e s m b =
+runVorple
+  :: forall a b e m s. (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+  -- The runner for the inner monad
+  => (forall x. m x -> IO x)
   -- Options
-  Options
+  -> Options
   -- The initial environment
   -> e
   -- The default session state
@@ -83,13 +82,6 @@ type RunVorple a e s m b =
   -> (a -> Vorple e s m b)
   -- The application
   -> W.Application
-
-runVorple
-  :: forall a e s m b. RvCtx a e s m b
-  -- The runner for the inner monad
-  => (m (Either H.Status (b, s), ByteString) -> IO (Either H.Status (b, s), ByteString))
-  -- Everything else
-  -> RunVorple a e s m b
 runVorple runner opts env emptySession handler req = do
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   lift $ case W.pathInfo req of
@@ -110,7 +102,7 @@ runVorple runner opts env emptySession handler req = do
       $(say "CSRF key matches")
       session <- requireJust $ decodeJSON $ cAppData cookie
       (response, nextSession) <-
-        mapInternal (liftIO . runner)
+        mapInternal (liftIO . (runner :: m (Either H.Status (b, s), ByteString) -> IO (Either H.Status (b, s), ByteString)))
         $ runVorpleInternal (handler $ csrfData input) session
       $(say "Ran request handler")
       let
@@ -122,9 +114,31 @@ runVorple runner opts env emptySession handler req = do
       $(say "About to return response")
       return (response, cookieBytes)
 
-runVorpleIO :: RvCtx a e s IO b => RunVorple a e s IO b
+runVorpleIO
+  :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+  -- Options
+  => Options
+  -- The initial environment
+  -> e
+  -- The default session state
+  -> s
+  -- The request handler
+  -> (a -> Vorple e s IO b)
+  -- The application
+  -> W.Application
 runVorpleIO = runVorple id
 
-runVorpleIdentity :: RvCtx a e s Identity b => RunVorple a e s Identity b
+runVorpleIdentity
+  :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
+  -- Options
+  => Options
+  -- The initial environment
+  -> e
+  -- The default session state
+  -> s
+  -- The request handler
+  -> (a -> Vorple e s Identity b)
+  -- The application
+  -> W.Application
 runVorpleIdentity = runVorple $ return . runIdentity
 

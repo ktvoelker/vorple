@@ -37,11 +37,9 @@ mapInternal = mapVorple . (lift .) . (. flip evalStateT ())
 liftInternal :: (Monad m) => Internal e m a -> Vorple e s m a
 liftInternal = mapVorple $ lift . flip evalStateT ()
 
-runVorpleInternal :: forall a e m s. (Monad m) => Vorple e s m a -> s -> Internal e m (a, s)
+runVorpleInternal :: (Monad m) => Vorple e s m a -> s -> Internal e m (a, s)
 runVorpleInternal m s = mapVorple f m
   where
-    f :: StateT s m (Either Status a, ByteString)
-      -> StateT () m (Either Status (a, s), ByteString)
     f m = do
       ((result, log), state) <- lift $ runStateT m s
       return $ case result of
