@@ -5,6 +5,7 @@ FunctionalDependencies
 GeneralizedNewtypeDeriving
 MultiParamTypeClasses
 OverloadedStrings
+RankNTypes
 RecordWildCards
 ScopedTypeVariables
 TemplateHaskell

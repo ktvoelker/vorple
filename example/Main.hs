@@ -12,6 +12,10 @@ import Web.Vorple
 main = run $ \cmd -> case cmd of
   C.Echo{..} -> do
     return $ R.Echo number
+  C.Incr -> do
+    s <- get
+    put $ s { count = count s + 1 }
+    return $ R.Echo $ count s
   C.Login{..} -> do
     c <- asks conn
     r <- liftIO $ query c

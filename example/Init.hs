@@ -23,6 +23,6 @@ run h =
     , connectUser     = "karl"
     , connectPassword = ""
     }
-  >>= return . flip (flip (runVorpleIO opts) emptySession) h . Env
+  >>= return . flip (flip (vorpleIO opts) emptySession) h . Env
   >>= FastCGI.run
 

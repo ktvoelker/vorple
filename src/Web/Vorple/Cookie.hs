@@ -20,8 +20,14 @@ import Web.Vorple.Types
 cookiePrefix :: Text
 cookiePrefix = "s="
 
+cookieSuffix :: Text
+cookieSuffix = "; path=/"
+
 cookiePrefixBytes :: ByteString
 cookiePrefixBytes = encodeUtf8 cookiePrefix
+
+cookieSuffixBytes :: ByteString
+cookieSuffixBytes = encodeUtf8 cookieSuffix
 
 getHmacSum :: [Word8] -> Base64 -> ByteString -> Base64
 getHmacSum appKey csrfKey appDataBytes =
@@ -63,15 +69,15 @@ getCookie appKey rs = do
     guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
     return c
 
-makeCookie :: (ToJSON a) => [Word8] -> Base64 -> a -> ByteString
-makeCookie appKey csrfKey appData =
+makeCookie :: [Word8] -> Base64 -> ByteString -> ByteString
+makeCookie appKey csrfKey appDataBytes =
   BS.append cookiePrefixBytes
+  $ flip BS.append cookieSuffixBytes
   $ encodeUrl
+  -- TODO is this the best way to accomplish the encoding?
   $ encodeUtf8
   $ showJSON
   $ Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes
-  where
-    appDataBytes = encodeJSON appData
 
 setCookie :: ByteString -> H.ResponseHeaders -> H.ResponseHeaders
 setCookie = (:) . ("Set-Cookie",) . strictBytes

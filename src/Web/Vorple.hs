@@ -3,9 +3,9 @@ module Web.Vorple
   ( Vorple()
   , Options(..)
   , defaultOptions
-  , runVorple
-  , runVorpleIO
-  , runVorpleIdentity
+  , vorpleT
+  , vorpleIO
+  , vorple
   , throwError
   , ask
   , asks
@@ -68,7 +68,7 @@ runInternalAction opts env internal = do
   let headers = maybe [] (flip setCookie []) cookie
   return $ W.ResponseBuilder status headers body
 
-runVorple
+vorpleT
   :: forall a b e m s. (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
   -- The runner for the inner monad
   => (forall x. m x -> IO x)
@@ -82,39 +82,41 @@ runVorple
   -> (a -> Vorple e s m b)
   -- The application
   -> W.Application
-runVorple runner opts env emptySession handler req = do
+vorpleT runner opts env emptySession handler req = do
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
-  lift $ case W.pathInfo req of
-    ["init"] -> runInternalAction opts env $ do
-      $(say "Got request for /init")
-      cookie <- getCookie appKey $ W.requestHeaders req
-      require $ isNothing cookie
-      csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
-      return ((), Just $ makeCookie appKey csrfKey emptySession)
-    [] -> runInternalAction opts env $ do
-      $(say "Got request for /")
-      maybeInput <- liftIO $ decodeJSONSource $ W.requestBody req
-      input <- maybe (throwError H.status400) return maybeInput
-      $(say "Got JSON data")
-      cookie <- getCookie appKey (W.requestHeaders req) >>= requireJust
-      $(say "Got cookie")
-      require $ csrfKey input == cCsrfKey cookie
-      $(say "CSRF key matches")
-      session <- requireJust $ decodeJSON $ cAppData cookie
-      (response, nextSession) <-
-        mapInternal (liftIO . (runner :: m (Either H.Status (b, s), ByteString) -> IO (Either H.Status (b, s), ByteString)))
-        $ runVorpleInternal (handler $ csrfData input) session
-      $(say "Ran request handler")
-      let
-      { cookieBytes =
-        if session /= nextSession
-        then Just $ makeCookie appKey (cCsrfKey cookie) $ encodeJSON nextSession
-        else Nothing
-      }
-      $(say "About to return response")
-      return (response, cookieBytes)
+  lift $ runInternalAction opts env $ do
+    when (W.requestMethod req /= H.methodPost) $ throwError H.status405
+    $(say "Got a POST")
+    maybeInput <- liftIO $ decodeJSONSource $ W.requestBody req
+    input <- maybe (throwError H.status400) return maybeInput
+    $(say "Got JSON data")
+    cookie <- getCookie appKey (W.requestHeaders req)
+    (csrfKey, session) <- case cookie of
+      Nothing -> do
+        $(say "No cookie; generating CSRF key")
+        csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
+        return (csrfKey, emptySession)
+      Just cookie -> do
+        $(say "Got cookie")
+        require $ csrfKey input == cCsrfKey cookie
+        $(say "CSRF key matches")
+        session <- requireJust $ decodeJSON $ cAppData cookie
+        return (cCsrfKey cookie, session)
+    (response, nextSession) <-
+      mapInternal (liftIO . runner)
+      $ runVorpleInternal (handler $ csrfData input) session
+    $(say "Ran request handler")
+    let
+    { cookieBytes =
+      if session /= nextSession
+      then Just $ makeCookie appKey csrfKey $ encodeJSON nextSession
+      else Nothing
+    }
+    maybe (return ()) $(say "Made cookie for response %b") cookieBytes
+    $(say "About to return response")
+    return (response, cookieBytes)
 
-runVorpleIO
+vorpleIO
   :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
   -- Options
   => Options
@@ -126,9 +128,9 @@ runVorpleIO
   -> (a -> Vorple e s IO b)
   -- The application
   -> W.Application
-runVorpleIO = runVorple id
+vorpleIO = vorpleT id
 
-runVorpleIdentity
+vorple
   :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
   -- Options
   => Options
@@ -140,5 +142,5 @@ runVorpleIdentity
   -> (a -> Vorple e s Identity b)
   -- The application
   -> W.Application
-runVorpleIdentity = runVorple $ return . runIdentity
+vorple = vorpleT $ return . runIdentity
 

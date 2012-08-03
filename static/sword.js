@@ -1,18 +1,8 @@
 
 $(document).ready(function() {
+  $("#cookie").text(document.cookie);
   $("#reset").click(function() {
     document.cookie = "";
-  });
-  $("#init").click(function() {
-    $.ajax("/test/bin/main/init", {
-      type: 'POST',
-      success: function(d) {
-        $("#result").text(JSON.stringify(d));
-      },
-      error: function(x, t, e) {
-        $("#result").text(t);
-      }
-    });
   });
   $("#send").click(function() {
     $.ajax("/test/bin/main", {

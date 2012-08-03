@@ -2,35 +2,10 @@
 To-Do
 =====
 
-All of the places where we try to map inside the big nested monad turn out rather
-ugly. And the need for the "runner for the inner monad" is sort of odd. Is there some
-way that we can just return a value in the inner monad and let the user sort it out?
-
-Use a free monad to get IO out of both the Vorple core and the request handler
-* Since logging doesn't need IO, the Vorple internals don't need IO at all
-* runVorple already takes a "runner for the inner monad" to convert the user's
-  inner monad to IO, so the user could already be using the operational library with
-  their own interpreter
-* But, if we add a ProgramT into the Vorple stack, and a new type parameter i for
-  the instruction type, we could constrain the instruction type to be showable, which
-  would allow us to log the program when it fails
-* This would also simplify the type of the "runner for the inner monad" quite a bit:
-  we would just need an interpreter that can execute one instruction, returning a value
-  in the user's inner monad
-* Note that both Vorple and Internal will need to contain the ProgramT, and both already
-  contain the user's inner monad. The only difference between these two monads is the
-  presence of the session state.
-  * This means we can do logging as we interpret the instructions.
-* Do we need runVorpleIO and runVorpleIdentity anymore?
-
-Add support for non-JSON input and output
-* Provide both the JSON and Initialization handler creators
-
-Add a routing module
+Move cookie parsing and cookie creation into the Internal monad so we can debug it
+more easily
 
 Write Haddock documentation
 
 Write tests
-
-Add a DB module that ensures transactionality of requests
 

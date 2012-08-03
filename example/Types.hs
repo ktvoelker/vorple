@@ -9,11 +9,12 @@ data Env = Env
   }
 
 data Session = Session
-  { user :: Maybe Int
+  { user  :: Maybe Int
+  , count :: Int
   } deriving (Eq)
 
 emptySession :: Session
-emptySession = Session Nothing
+emptySession = Session Nothing 0
 
 $(deriveJSON id ''Session)
 
