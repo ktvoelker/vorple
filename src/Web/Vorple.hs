@@ -1,11 +1,24 @@
 
-module Web.Vorple
-  ( Vorple()
-  , Options(..)
+-- |Vorple is a framework for serving a JSON application over HTTP via WAI.
+module Web.Vorple (
+  -- * Types
+    Vorple()
+  -- * Running a Vorple application
   , defaultOptions
-  , vorpleT
-  , vorpleIO
   , vorple
+  , vorpleIO
+  , vorpleT
+  -- * Options
+  , Options(..)
+  , LogLevel(..)
+  , MonadOptions(..)
+  -- * Logging functions
+  , debug
+  , info
+  , warn
+  , err
+  , crit
+  -- * Re-exported functions
   , throwError
   , ask
   , asks
@@ -13,11 +26,6 @@ module Web.Vorple
   , put
   , modify
   , liftIO
-  , debug
-  , info
-  , warn
-  , err
-  , crit
   ) where
 
 import Control.Monad.Error
@@ -68,20 +76,15 @@ runInternalAction opts env internal = do
   let headers = maybe [] (flip setCookie []) cookie
   return $ W.ResponseBuilder status headers body
 
+-- |Make a WAI Application from a request handler with any inner monad
 vorpleT
   :: forall a b e m s. (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
-  -- The runner for the inner monad
-  => (forall x. m x -> IO x)
-  -- Options
-  -> Options
-  -- The initial environment
-  -> e
-  -- The default session state
-  -> s
-  -- The request handler
-  -> (a -> Vorple e s m b)
-  -- The application
-  -> W.Application
+  => (forall x. m x -> IO x)  -- ^The runner for the inner monad
+  -> Options                  -- ^Options
+  -> e                        -- ^The initial environment
+  -> s                        -- ^The default session state
+  -> (a -> Vorple e s m b)    -- ^The request handler
+  -> W.Application            -- ^The application
 vorpleT runner opts env emptySession handler req = do
   appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
   lift $ runInternalAction opts env $ do
@@ -116,31 +119,23 @@ vorpleT runner opts env emptySession handler req = do
     $(say "About to return response")
     return (response, cookieBytes)
 
+-- |Make a WAI Application from an IO request handler
 vorpleIO
   :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
-  -- Options
-  => Options
-  -- The initial environment
-  -> e
-  -- The default session state
-  -> s
-  -- The request handler
-  -> (a -> Vorple e s IO b)
-  -- The application
-  -> W.Application
+  => Options                  -- ^Options
+  -> e                        -- ^The initial environment
+  -> s                        -- ^The default session state
+  -> (a -> Vorple e s IO b)   -- ^The request handler
+  -> W.Application            -- ^The application
 vorpleIO = vorpleT id
 
+-- |Make a WAI Application from a pure request handler
 vorple
   :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
-  -- Options
-  => Options
-  -- The initial environment
-  -> e
-  -- The default session state
-  -> s
-  -- The request handler
-  -> (a -> Vorple e s Identity b)
-  -- The application
-  -> W.Application
+  => Options                       -- ^Options
+  -> e                             -- ^The initial environment
+  -> s                             -- ^The default session state
+  -> (a -> Vorple e s Identity b)  -- ^The request handler
+  -> W.Application                 -- ^The application
 vorple = vorpleT $ return . runIdentity
 

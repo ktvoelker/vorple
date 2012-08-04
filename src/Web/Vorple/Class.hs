@@ -14,27 +14,7 @@ class MonadOptions m where
   asksOpt :: (Options -> a) -> m a
 
 instance (Monad m) => MonadOptions (Vorple e s m) where
-  asksOpt = Vorple . lift . lift . OptionsT . asks
-
-instance (Monad m) => Monad (OptionsT m) where
-  return = OptionsT . return
-  OptionsT m >>= f = OptionsT $ m >>= getOptionsT . f
-  fail = OptionsT . fail
-
-instance MonadTrans OptionsT where
-  lift = OptionsT . lift
-
-instance (MonadIO m) => MonadIO (OptionsT m) where
-  liftIO = OptionsT . liftIO
-
-instance (MonadReader r m) => MonadReader r (OptionsT m) where
-  ask = lift ask
-  local f = OptionsT . mapReaderT (local f) . getOptionsT
-  reader = lift . reader
-
-instance (MonadState s m) => MonadState s (OptionsT m) where
-  get = lift get
-  put = lift . put
+  asksOpt = Vorple . asks . (. snd)
 
 instance Error Status where
   noMsg = status500
@@ -45,21 +25,27 @@ instance (Monad m) => Monad (Vorple e s m) where
   fail = Vorple . fail
 
 instance MonadTrans (Vorple e s) where
-  lift = Vorple . lift . lift . lift . lift . lift
+  lift = Vorple . lift . lift . lift . lift
 
+-- |With this instance, you can throw an HTTP error code to abort the request
+-- and return that code to the client
 instance (Monad m) => MonadError Status (Vorple e s m) where
   throwError     = Vorple . throwError
   catchError m f = Vorple $ getVorple m `catchError` (getVorple . f)
 
+-- |This instance provides access to the environment that you specify when creating
+-- the application
 instance (Monad m) => MonadReader e (Vorple e s m) where
-  ask     = Vorple ask
-  local f = Vorple . local f . getVorple
-  reader  = Vorple . reader
+  ask     = Vorple $ asks fst
+  local f = Vorple . local (\(e, o) -> (f e, o)) . getVorple
 
+-- |This instance provides access to the client's session state, which is stored on
+-- the client in a cookie.
 instance (Monad m) => MonadState s (Vorple e s m) where
   get = Vorple get
   put = Vorple . put
 
+-- |This instance provides a log which is written to standard error.
 instance (Monad m) => MonadWriter ByteString (Vorple e s m) where
   writer = Vorple . writer
   tell   = Vorple . tell

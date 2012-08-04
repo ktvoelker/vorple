@@ -10,8 +10,6 @@ import Network.HTTP.Types (Status(), status500)
 import Web.Vorple.Text
 import Web.Vorple.Types
 
-mapOptionsT f = OptionsT . mapReaderT f . getOptionsT
-
 mapStateT' f = mapStateT f'
   where
     f' (x, s) = (f x, s)
@@ -24,7 +22,7 @@ mapVorple
   -> Vorple e t n b
 mapVorple f =
   Vorple
-  . (mapErrorT . mapWriterT . mapOptionsT . mapReaderT) f
+  . (mapErrorT . mapWriterT . mapReaderT) f
   . getVorple
 
 mapInternal
@@ -56,7 +54,6 @@ runInternal internal opts env = inner
   where
     error = getVorple internal
     writer = runErrorT error
-    optReader = getOptionsT $ runWriterT writer
-    reader = runReaderT optReader opts
-    inner = flip evalStateT () $ runReaderT reader env
+    reader = runWriterT writer
+    inner = flip evalStateT () $ runReaderT reader (env, opts)
 
