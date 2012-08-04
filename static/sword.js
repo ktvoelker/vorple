@@ -1,6 +1,10 @@
 
-$(document).ready(function() {
+function showCookie() {
   $("#cookie").text(document.cookie);
+}
+
+$(document).ready(function() {
+  showCookie();
   $("#reset").click(function() {
     document.cookie = "";
   });
@@ -12,9 +16,11 @@ $(document).ready(function() {
       data: $("#query").val(),
       type: 'POST',
       success: function(d) {
+        showCookie();
         $("#result").text(JSON.stringify(d));
       },
       error: function(x, t, e) {
+        showCookie();
         $("#result").text(t);
       }
     });
