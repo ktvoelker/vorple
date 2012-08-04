@@ -61,13 +61,7 @@ getCookie appKey rs = do
   }
   $(say "COOKIE SUMS ACCEPTED:")
   mapM_ $(say "%j") cookieSums
-  let cookieDataBytes = map cAppData cookies
-  $(say "COOKIE APP DATA BYTES:")
-  mapM $(say "%b") cookieDataBytes
-  return $ listToMaybe $ do
-    c@Cookie{..} <- catMaybes $ map decodeJSON hs
-    guard $ getHmacSum appKey cCsrfKey cAppData == cHmacSum
-    return c
+  return $ listToMaybe cookies
 
 makeCookie :: [Word8] -> Base64 -> ByteString -> ByteString
 makeCookie appKey csrfKey appDataBytes =

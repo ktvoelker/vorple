@@ -2,9 +2,6 @@
 To-Do
 =====
 
-Move cookie parsing and cookie creation into the Internal monad so we can debug it
-more easily
-
 Write Haddock documentation
 
 Write tests
