@@ -109,15 +109,13 @@ vorpleT runner opts env emptySession handler req = do
       mapInternal (liftIO . runner)
       $ runVorpleInternal (handler $ csrfData input) session
     $(say "Ran request handler")
-    let
-    { cookieBytes =
+    cookieBytes <-
       if session /= nextSession
-      then Just $ makeCookie appKey csrfKey $ encodeJSON nextSession
-      else Nothing
-    }
+      then makeCookie appKey csrfKey (encodeJSON nextSession) >>= return . Just
+      else return Nothing
     maybe (return ()) $(say "Made cookie for response %b") cookieBytes
     $(say "About to return response")
-    return (response, cookieBytes)
+    return (Csrf csrfKey response, cookieBytes)
 
 -- |Make a WAI Application from an IO request handler
 vorpleIO

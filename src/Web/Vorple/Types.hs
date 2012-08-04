@@ -28,17 +28,20 @@ data LogLevel =
 -- |Options available when making an application
 data Options = Options
   {
-  -- |Enable internal debug logging
-    optLogLevel :: LogLevel
+  -- |Logs below this level are suppressed
+    optLogLevel      :: LogLevel
   -- |The secret application key (random if Nothing)
-  , optAppKey   :: Maybe [Word8]
+  , optAppKey        :: Maybe [Word8]
+  -- |Only allow cookies to be sent over secure connections
+  , optSecureCookies :: Bool
   } deriving (Eq, Ord, Read, Show)
 
 -- |A default set of options
 defaultOptions :: Options
 defaultOptions = Options
-  { optLogLevel = VorpleDebug
-  , optAppKey   = Nothing
+  { optLogLevel      = VorpleDebug
+  , optAppKey        = Nothing
+  , optSecureCookies = False
   }
 
 -- |A monad transformer for a JSON-over-HTTP application

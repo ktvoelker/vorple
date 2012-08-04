@@ -13,6 +13,7 @@ import Data.List
 import Data.List.Split
 import Data.Maybe
 
+import Web.Vorple.Class
 import Web.Vorple.Log
 import Web.Vorple.Text
 import Web.Vorple.Types
@@ -21,13 +22,19 @@ cookiePrefix :: Text
 cookiePrefix = "s="
 
 cookieSuffix :: Text
-cookieSuffix = "; path=/"
+cookieSuffix = "; path=/; httponly"
+
+cookieSecureSuffix :: Text
+cookieSecureSuffix = "; secure"
 
 cookiePrefixBytes :: ByteString
 cookiePrefixBytes = encodeUtf8 cookiePrefix
 
 cookieSuffixBytes :: ByteString
 cookieSuffixBytes = encodeUtf8 cookieSuffix
+
+cookieSecureSuffixBytes :: ByteString
+cookieSecureSuffixBytes = encodeUtf8 cookieSecureSuffix
 
 getHmacSum :: [Word8] -> Base64 -> ByteString -> Base64
 getHmacSum appKey csrfKey appDataBytes =
@@ -63,15 +70,23 @@ getCookie appKey rs = do
   mapM_ $(say "%j") cookieSums
   return $ listToMaybe cookies
 
-makeCookie :: [Word8] -> Base64 -> ByteString -> ByteString
-makeCookie appKey csrfKey appDataBytes =
-  BS.append cookiePrefixBytes
-  $ flip BS.append cookieSuffixBytes
-  $ encodeUrl
-  -- TODO is this the best way to accomplish the encoding?
-  $ encodeUtf8
-  $ showJSON
-  $ Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes
+makeCookie
+  :: (Monad m, MonadOptions m)
+  => [Word8]
+  -> Base64
+  -> ByteString
+  -> m ByteString
+makeCookie appKey csrfKey appDataBytes = do
+  secure <- asksOpt optSecureCookies
+  return
+    $ BS.append cookiePrefixBytes
+    $ (if secure then flip BS.append cookieSecureSuffixBytes else id)
+    $ flip BS.append cookieSuffixBytes
+    $ encodeUrl
+    -- TODO is this the best way to accomplish the encoding?
+    $ encodeUtf8
+    $ showJSON
+    $ Cookie (getHmacSum appKey csrfKey appDataBytes) csrfKey appDataBytes
 
 setCookie :: ByteString -> H.ResponseHeaders -> H.ResponseHeaders
 setCookie = (:) . ("Set-Cookie",) . strictBytes

@@ -2,11 +2,8 @@
 To-Do
 =====
 
-Try using the RWS monad instead of the triple-stack
-
-Change to non-JS-readable cookies, instead wrapping the JSON result with the CSRF key
-
 Write Haddock documentation
+* Logging functions
 
 Write tests
 

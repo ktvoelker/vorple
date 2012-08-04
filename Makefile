@@ -1,5 +1,5 @@
 
-.PHONY: all configure build install static deploy clean
+.PHONY: all configure build install static deploy clean doc
 
 TARGET=/srv/httpd/test
 
