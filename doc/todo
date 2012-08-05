@@ -2,8 +2,11 @@
 To-Do
 =====
 
+Write tests
+
 Write Haddock documentation
 * Logging functions
+* Internal functions
 
-Write tests
+Add better package version dependencies
 

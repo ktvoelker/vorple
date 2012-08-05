@@ -73,6 +73,17 @@ Executable vorple-example-main
     RecordWildCards
     TemplateHaskell
 
+Test-Suite vorple-tests
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  default-language: Haskell2010
+  main-is: Test.hs
+  build-depends:
+    base >= 3 && < 5,
+    HUnit -any,
+    wai -any,
+    wai-test -any
+
 Executable vorple-example-listen
   hs-source-dirs: example
   default-language: Haskell2010

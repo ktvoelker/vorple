@@ -1,12 +1,15 @@
 
-.PHONY: all configure build install static deploy clean doc
+.PHONY: all configure build install static deploy clean doc test
 
 TARGET=/srv/httpd/test
 
 all: build doc
 
-doc:
+doc: configure
 	cabal-dev haddock
+
+test: build
+	cabal-dev test
 
 install: build
 	-cabal-dev ghc-pkg unregister vorple
@@ -21,7 +24,7 @@ deploy: install static
 	apachectl graceful
 
 configure:
-	cabal-dev configure
+	cabal-dev configure --enable-tests
 
 build: configure
 	cabal-dev build
