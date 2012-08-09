@@ -82,7 +82,16 @@ Test-Suite vorple-tests
     base >= 3 && < 5,
     HUnit -any,
     wai -any,
-    wai-test -any
+    wai-test -any,
+    http-types -any,
+    bytestring -any,
+    text -any,
+    aeson -any,
+    vorple -any
+  default-extensions:
+    OverloadedStrings
+    RecordWildCards
+    TemplateHaskell
 
 Executable vorple-example-listen
   hs-source-dirs: example

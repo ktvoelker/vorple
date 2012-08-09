@@ -3,7 +3,7 @@
 
 TARGET=/srv/httpd/test
 
-all: build doc
+all: build
 
 doc: configure
 	cabal-dev haddock
