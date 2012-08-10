@@ -29,30 +29,44 @@ data Rec1
 
 $(deriveJSON id ''Rec1)
 
-rb :: ByteString -> Request
-rb = simpleRequest . SRequest (defaultRequest { requestMethod = methodPost })
+rb :: ByteString -> Session SResponse
+rb = srequest . SRequest (defaultRequest { requestMethod = methodPost })
 
-rt :: Text -> Request
+rt :: Text -> Session SResponse
 rt = rb . encodeUtf8
 
-rj :: (ToJSON a) => a -> Request
+rj :: (ToJSON a) => a -> Session SResponse
 rj = rb . encode
 
 appEcho :: Application
 appEcho = vorple defaultOptions () () $ \r -> return (r :: Rec1)
 
+-- | Assert that the response body is the given JSON object wrapped in a Csrf
+-- object, and return the CSRF key string.
+assertJsonBody :: (FromJSON a, Eq a, Show a) => a -> SResponse -> Session String
+assertJsonBody expBody x = liftIO $ do
+  case decode $ simpleBody x of
+    Nothing -> do
+      assertFailure "Failed to parse response body"
+      return ""
+    Just (Csrf actKey actBody) -> do
+      assertEqual "response body" expBody actBody
+      return actKey
+
+assertNoCookie :: SResponse -> Session ()
+assertNoCookie = assertNoHeader "Set-Cookie"
+
 testEcho1 = TestLabel "testEcho1" $ TestCase $ flip runSession appEcho $ do
-  let body = Rec1a 0 1
-  liftIO $ System.IO.hPutStr stderr "Hello, world! 1\n"
-  liftIO $ Data.ByteString.Lazy.hPutStr stderr $ encode $ Csrf "" $ Rec1a 0 1
-  let sr = rj $ Csrf "" $ Rec1a 0 1
-  liftIO $ System.IO.hPutStr stderr "Hello, world! 2\n"
-  x <- request sr
-  liftIO $ Data.ByteString.Lazy.hPutStr stderr $ simpleBody x
-  assertStatus 200 x
-  assertNoHeader "Set-Cookie" x
-  let Just (Csrf key _) = decode $ simpleBody x :: Maybe (Csrf Rec1)
-  assertBody (encode $ Csrf key body) x
+  let b1 = Rec1a 0 1
+  r1 <- rj $ Csrf "" b1
+  assertStatus 200 r1
+  assertNoCookie r1
+  void $ assertJsonBody b1 r1
+  let b2 = Rec1a 1 0
+  r2 <- rj $ Csrf "" b2
+  assertStatus 200 r2
+  assertNoCookie r2
+  void $ assertJsonBody b2 r2
 
 tests = TestList [testEcho1]
 
