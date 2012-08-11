@@ -2,6 +2,9 @@
 To-Do
 =====
 
+Replace all the cookie-parsing code with Web.Cookie
+* Use it for testing, too
+
 Write tests
 * Positive tests
  * App key
