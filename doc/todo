@@ -3,8 +3,27 @@ To-Do
 =====
 
 Write tests
+* Positive tests
+ * App key
+ * Cookie options
+ * Out-of-order use of cookies
+ * Environment consistency
+ * Send irrelevant cookie
+ * Throw error
+* Negative tests
+ * Send invalid CSRF key
+ * Send invalid cookie
+ * Send invalid body
+ * Use invalid method
+ * Use invalid path
+
+Set better default options
+
+Add an option to name the cookie
+* With tests
 
 Write Haddock documentation
+* Package description
 * Logging functions
 * Internal functions
 
