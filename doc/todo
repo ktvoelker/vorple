@@ -22,6 +22,8 @@ Set better default options
 Add an option to name the cookie
 * With tests
 
+Write a README
+
 Write Haddock documentation
 * Package description
 * Logging functions
