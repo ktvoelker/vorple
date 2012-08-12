@@ -32,6 +32,7 @@ Library
     attoparsec -any,
     attoparsec-conduit -any,
     http-types -any,
+    cookie -any,
     wai -any
   exposed-modules:
     Web.Vorple
@@ -97,6 +98,7 @@ Test-Suite vorple-tests
     attoparsec -any,
     attoparsec-conduit -any,
     http-types -any,
+    cookie -any,
     wai -any
   default-extensions:
     FlexibleContexts

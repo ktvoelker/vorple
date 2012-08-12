@@ -24,6 +24,7 @@ module Web.Vorple.Text
   , decodeUrl
   , StrictByteString()
   , strictBytes
+  , lazyBytes
   ) where
 
 import Data.List
@@ -116,4 +117,7 @@ decodeUrl = fmap packBytes . UE.decode . unpackString . decodeUtf8
 
 strictBytes :: ByteString -> StrictByteString
 strictBytes = Data.ByteString.concat . BS.toChunks
+
+lazyBytes :: StrictByteString -> ByteString
+lazyBytes = BS.fromChunks . (: [])
 
