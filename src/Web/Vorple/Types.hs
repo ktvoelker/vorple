@@ -32,8 +32,12 @@ data Options = Options
     optLogLevel      :: LogLevel
   -- |The secret application key (random if Nothing)
   , optAppKey        :: Maybe [Word8]
-  -- |Only allow cookies to be sent over secure connections
-  , optSecureCookies :: Bool
+  -- |The name of the session cookie
+  , optCookieName    :: Text
+  -- |The path under which the session cookie should be returned by the client
+  , optCookiePath    :: Maybe Text
+  -- |Only allow the session cookie to be sent over a secure connection
+  , optSecureCookie  :: Bool
   } deriving (Eq, Ord, Read, Show)
 
 -- |A default set of options
@@ -41,7 +45,9 @@ defaultOptions :: Options
 defaultOptions = Options
   { optLogLevel      = VorpleDebug
   , optAppKey        = Nothing
-  , optSecureCookies = False
+  , optCookieName    = "s"
+  , optCookiePath    = Just "/"
+  , optSecureCookie  = False
   }
 
 -- |A monad transformer for a JSON-over-HTTP application

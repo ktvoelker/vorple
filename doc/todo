@@ -2,9 +2,6 @@
 To-Do
 =====
 
-Replace all the cookie-parsing code with Web.Cookie
-* Use it for testing, too
-
 Write tests
 * Positive tests
  * App key
@@ -21,9 +18,6 @@ Write tests
  * Use invalid path
 
 Set better default options
-
-Add an option to name the cookie
-* With tests
 
 Write a README
 

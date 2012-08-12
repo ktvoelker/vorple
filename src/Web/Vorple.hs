@@ -59,23 +59,6 @@ requireJust = maybe (throwError H.status400) return
 randomKey :: Int -> IO [Word8]
 randomKey n = mapM (const $ getStdRandom random) [1 .. n]
 
-runInternalAction
-  :: (ToJSON a)
-  => Options
-  -> e
-  -> Internal e IO (a, Maybe ByteString)
-  -> IO W.Response
-runInternalAction opts env internal = do
-  (result, log) <- runInternal internal opts env
-  BS.hPutStr stderr log
-  let
-  { (status, body, cookie) = case result of
-      Left status          -> (status, encodeJSONBuilder (), Nothing)
-      Right (body, cookie) -> (H.status200, encodeJSONBuilder body, cookie)
-  }
-  let headers = maybe [] (flip setCookie []) cookie
-  return $ W.ResponseBuilder status headers body
-
 -- |Make a WAI Application from a request handler with any inner monad
 vorpleT
   :: forall a b e m s. (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
@@ -85,9 +68,9 @@ vorpleT
   -> s                        -- ^The default session state
   -> (a -> Vorple e s m b)    -- ^The request handler
   -> W.Application            -- ^The application
-vorpleT runner opts env emptySession handler req = do
-  appKey <- maybe (liftIO $ randomKey 32) return $ optAppKey opts
-  lift $ runInternalAction opts env $ do
+vorpleT runner opts env emptySession handler req = liftIO $ do
+  appKey <- maybe (randomKey 32) return $ optAppKey opts
+  (result, log) <- flip (flip runInternal opts) env $ do
     when (W.requestMethod req /= H.methodPost) $ throwError H.status405
     $(say "Got a POST")
     maybeInput <- liftIO $ decodeJSONSource $ W.requestBody req
@@ -109,13 +92,19 @@ vorpleT runner opts env emptySession handler req = do
       mapInternal (liftIO . runner)
       $ runVorpleInternal (handler $ csrfData input) session
     $(say "Ran request handler")
-    cookieBytes <-
+    cookie <-
       if session /= nextSession
-      then makeCookie appKey csrfKey (encodeJSON nextSession) >>= return . Just
+      then setCookie appKey csrfKey (encodeJSON nextSession) >>= return . Just
       else return Nothing
-    maybe (return ()) $(say "Made cookie for response %b") cookieBytes
     $(say "About to return response")
-    return (Csrf csrfKey response, cookieBytes)
+    return (Csrf csrfKey response, cookie)
+  BS.hPutStr stderr log
+  let
+  { (status, body, cookie) = case result of
+      Left status          -> (status, encodeJSONBuilder (), Nothing)
+      Right (body, cookie) -> (H.status200, encodeJSONBuilder body, cookie)
+  }
+  return $ W.ResponseBuilder status (maybeToList cookie) body
 
 -- |Make a WAI Application from an IO request handler
 vorpleIO

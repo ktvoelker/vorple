@@ -16,6 +16,7 @@ module Web.Vorple.Text
   , decodeUtf8
   , ByteString()
   , Word8
+  , appendBytes
   , packBytes
   , unpackBytes
   , Base64(..)
@@ -91,6 +92,9 @@ packString = T.pack
 
 unpackString :: Text -> String
 unpackString = T.unpack
+
+appendBytes :: ByteString -> ByteString -> ByteString
+appendBytes = BS.append
 
 packBytes :: [Word8] -> ByteString
 packBytes = BS.pack
