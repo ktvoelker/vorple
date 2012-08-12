@@ -4,13 +4,16 @@ module Util
   , module Control.Monad
   , module Web.Vorple
   , deriveJSON
+  , assertBool
+  , assertFailure
+  , assertEqual
   , assertStatus
+  , runSession
   ) where
 
 import qualified Data.ByteString as SBS
 import qualified Data.Text as ST
 import qualified Data.Text.Encoding as STE
-import qualified Test.HUnit as H
 
 import Control.Monad
 import Data.Aeson
@@ -21,17 +24,9 @@ import Network.Wai
 import Network.Wai.Test
 import System.Exit
 import System.IO
+import Test.HUnit
 import Web.Vorple
 import Web.Vorple.Text
-
-assertEqual :: (Show a, Eq a) => String -> a -> a -> Session ()
-assertEqual p a b = liftIO $ H.assertEqual p a b
-
-assertBool :: String -> Bool -> Session ()
-assertBool p = liftIO . H.assertBool p
-
-assertFailure :: String -> Session ()
-assertFailure = liftIO . H.assertFailure
 
 data Csrf a
   = Csrf { csrfKey :: String, csrfData :: a }
@@ -61,10 +56,10 @@ assertJsonBody :: (FromJSON a, Eq a, Show a) => a -> SResponse -> Session String
 assertJsonBody expBody x = do
   case decode $ simpleBody x of
     Nothing -> do
-      assertFailure "Failed to parse response body"
+      liftIO $ assertFailure "Failed to parse response body"
       return ""
     Just (Csrf actKey actBody) -> do
-      assertEqual "response body" expBody actBody
+      liftIO $ assertEqual "response body" expBody actBody
       return actKey
 
 assertNoCookie :: SResponse -> Session ()
@@ -72,14 +67,17 @@ assertNoCookie = assertNoHeader "Set-Cookie"
 
 assertCookie :: SResponse -> Session String
 assertCookie resp = case filter ((== "Set-Cookie") . fst) $ simpleHeaders resp of
-  []      -> assertFailure "No cookie" >> return ""
+  []      -> liftIO (assertFailure "No cookie") >> return ""
   (c : _) -> return $ ST.unpack $ STE.decodeUtf8 $ snd c
 
-sessionTest :: String -> Application -> Session () -> H.Test
-sessionTest n a s = H.TestLabel n $ H.TestCase $ runSession s a
+sessionTest :: String -> Application -> Session () -> Test
+sessionTest n a s = TestLabel n $ TestCase $ runSession s a
 
-runTests :: [H.Test] -> IO ()
+multiTest :: String -> IO () -> Test
+multiTest n = TestLabel n . TestCase
+
+runTests :: [Test] -> IO ()
 runTests tests = do
-  c <- H.runTestTT $ H.TestList tests
-  when (H.errors c /= 0 || H.failures c /= 0) exitFailure
+  c <- runTestTT $ TestList tests
+  when (errors c /= 0 || failures c /= 0) exitFailure
 

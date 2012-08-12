@@ -2,9 +2,16 @@
 To-Do
 =====
 
+Use Web.Cookie in tests
+* Instead of using Network.Wai.Test.Session as the session monad, use StateT Session,
+  with Web.Cookies.Cookies as the state
+* When a request is run, automatically send and receive cookies
+  * Read the standards to determine when one cookie overwrites another
+* Provide a function that looks in the state for a cookie with a certain name and
+  produces an assertion failure if it doesn't exist
+
 Write tests
 * Positive tests
- * App key
  * Cookie options
  * Out-of-order use of cookies
  * Environment consistency

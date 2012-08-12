@@ -23,7 +23,7 @@ testEcho1 = sessionTest "testEcho1" appEcho $ do
   assertStatus 200 r2
   assertNoCookie r2
   k2 <- assertJsonBody b2 r2
-  assertBool "CSRF keys should not be equal" $ k1 /= k2
+  liftIO $ assertBool "CSRF keys should not be equal" $ k1 /= k2
 
 data Cmd
   = CmdGet
@@ -34,13 +34,17 @@ $(deriveJSON id ''Cmd)
 
 initState = Rec1a 0 0
 
-appState = vorple defaultOptions () initState $ \r -> case r of
-  CmdGet   -> get
-  CmdPut x -> do
-    prev <- get
-    put x
-    $(debug "put %j") x
-    return prev
+handleState CmdGet = get
+handleState (CmdPut x) = do
+  prev <- get
+  put x
+  $(debug "put %j") x
+  return prev
+
+appState = vorple defaultOptions () initState handleState
+
+appStateWithKey k =
+  vorple defaultOptions { optAppKey = Just k } () initState handleState
 
 testState1 = sessionTest "testState1" appState $ do
   -- get initial state
@@ -52,24 +56,36 @@ testState1 = sessionTest "testState1" appState $ do
   r2 <- rj $ Csrf k1 $ CmdPut b2
   assertStatus 200 r2
   k2 <- assertJsonBody initState r2
-  assertBool "CSRF keys should not be equal" $ k1 /= k2
+  liftIO $ assertBool "CSRF keys should not be equal" $ k1 /= k2
   c2 <- assertCookie r2
   -- set b3, returning b2
   let b3 = Rec1b 3 4
   r3 <- rjc c2 $ Csrf k2 $ CmdPut b3
   assertStatus 200 r3
   k3 <- assertJsonBody b2 r3
-  assertEqual "CSRF keys" k2 k3
+  liftIO $ assertEqual "CSRF keys" k2 k3
   c3 <- assertCookie r3
   -- get b3
   r4 <- rjc c3 $ Csrf k3 CmdGet
   assertStatus 200 r4
   k4 <- assertJsonBody b3 r4
-  assertEqual "CSRF keys" k3 k4
+  liftIO $ assertEqual "CSRF keys" k3 k4
+
+testAppKey1 = multiTest "testAppKey1" $ do
+  c1 <- flip runSession (appStateWithKey [1, 2, 3, 4]) s
+  c2 <- flip runSession (appStateWithKey [5, 6, 7, 8]) s
+  assertBool "HMAC sums should differ" $ c1 /= c2
+  where
+    s = do
+      r <- rj $ Csrf "" $ CmdPut $ Rec1a 1 1
+      assertStatus 200 r
+      assertJsonBody initState r
+      assertCookie r
 
 main =
   runTests
   [ testEcho1
   , testState1
+  , testAppKey1
   ]
 
