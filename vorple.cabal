@@ -37,12 +37,12 @@ Library
   exposed-modules:
     Web.Vorple
   other-modules:
-    Web.Vorple.Class
     Web.Vorple.Cookie
     Web.Vorple.Text
     Web.Vorple.Types
     Web.Vorple.Util
   hs-source-dirs: src
+  ghc-options: -Wall -Werror -fno-warn-name-shadowing
   default-language: Haskell2010
   default-extensions:
     FlexibleContexts
@@ -60,6 +60,7 @@ Library
 
 Executable vorple-example-main
   hs-source-dirs: example
+  ghc-options: -Wall -Werror -fno-warn-name-shadowing
   default-language: Haskell2010
   main-is: Main.hs
   build-depends:
@@ -77,6 +78,7 @@ Executable vorple-example-main
 Test-Suite vorple-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: src test
+  ghc-options: -Wall -Werror -fno-warn-name-shadowing
   default-language: Haskell2010
   main-is: Test.hs
   build-depends:
@@ -116,6 +118,7 @@ Test-Suite vorple-tests
 
 Executable vorple-example-listen
   hs-source-dirs: example
+  ghc-options: -Wall -Werror -fno-warn-name-shadowing
   default-language: Haskell2010
   main-is: Listen.hs
   build-depends:

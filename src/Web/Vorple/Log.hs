@@ -12,12 +12,8 @@ module Web.Vorple.Log
 import Control.Monad.Writer
 import Data.Either
 import Data.List
-import Data.Maybe
 import Language.Haskell.TH
 
-import qualified Data.Text.Lazy as T
-
-import Web.Vorple.Class
 import Web.Vorple.Text
 import Web.Vorple.Types
 
@@ -48,7 +44,6 @@ spanLiterals :: String -> (String, String)
 spanLiterals = span (/= '%')
 
 note :: Name -> String -> ExpQ
--- TODO respect the log level
 note level xs = let cs = parseControls xs in do
   cs' <- mapM n cs
   let vs = map snd $ lefts cs'
@@ -77,6 +72,7 @@ note level xs = let cs = parseControls xs in do
     -- Wrap with a lambda
     p body name = lamE [varP name] body
 
+say, debug, info, warn, err, crit :: String -> ExpQ
 say   = note 'VorpleDebug
 debug = note 'Debug
 info  = note 'Info

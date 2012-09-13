@@ -32,18 +32,14 @@ import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Writer
-import Data.List
 import Data.Maybe
-import System.IO (hPutStr, hPutStrLn, stderr)
+import System.IO (stderr)
 import System.Random
 
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text.Lazy as T
 import qualified Network.HTTP.Types as H
 import qualified Network.Wai as W
 
-import Web.Vorple.Class
 import Web.Vorple.Cookie
 import Web.Vorple.Log
 import Web.Vorple.Text

@@ -9,6 +9,7 @@ import qualified Types.Command as C
 import qualified Types.Result as R
 import Web.Vorple
 
+main :: IO ()
 main = run $ \cmd -> case cmd of
   C.Echo{..} -> do
     return $ R.Echo number

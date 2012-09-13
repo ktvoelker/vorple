@@ -2,8 +2,7 @@
 module Main where
 
 import Init
-import Types
-import Web.Vorple
 
+main :: IO ()
 main = run $ \() -> return ("Hello, world!" :: String)
 

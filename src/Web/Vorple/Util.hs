@@ -5,14 +5,16 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer
-import Network.HTTP.Types (Status(), status500)
+import Network.HTTP.Types (Status())
 
 import Web.Vorple.Text
 import Web.Vorple.Types
 
+{-
 mapStateT' f = mapStateT f'
   where
     f' (x, s) = (f x, s)
+-}
 
 mapVorple
   :: (  StateT s m (Either Status a, ByteString)

@@ -28,13 +28,12 @@ module Web.Vorple.Text
   , lazyBytes
   ) where
 
-import Data.List
 import Data.Maybe
 
 import Data.Aeson.TH (deriveJSON)
 import Data.Aeson.Types (ToJSON(..), FromJSON(..))
 import Data.ByteString.Lazy (ByteString())
-import Data.Conduit (($=), (=$), ($$))
+import Data.Conduit (($$))
 import Data.Text.Lazy (Text())
 import Data.Text.Lazy.Encoding (encodeUtf8, decodeUtf8)
 import Data.Word (Word8)
@@ -48,18 +47,11 @@ import qualified Codec.Binary.Url as UE
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Encode as JE
 import qualified Data.Aeson.Types as JT
-import qualified Data.Attoparsec.ByteString as P
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Attoparsec as CAP
-import qualified Data.Foldable as F
-import qualified Data.Monoid as M
-import qualified Data.Text.Encoding as ES
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Text.Lazy.Encoding as E
-import qualified Data.HMAC as HMAC
-import qualified GHC.Exts as X
 
 type StrictByteString = Data.ByteString.ByteString
 

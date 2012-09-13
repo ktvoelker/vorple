@@ -3,16 +3,12 @@ module Web.Vorple.Cookie where
 
 import qualified Blaze.ByteString.Builder as BB
 import qualified Network.HTTP.Types as H
-import qualified Network.Wai as W
 
 import Control.Monad
-import Control.Monad.Trans
 import Data.HMAC
-import Data.List
 import Data.Maybe
 import Web.Cookie
 
-import Web.Vorple.Class
 import Web.Vorple.Log
 import Web.Vorple.Text
 import Web.Vorple.Types
