@@ -2,13 +2,6 @@
 To-Do
 =====
 
-Stop using orphan instances
-* Make a newtype wrapper around HTTP statuses
-* Make a function that composes throwError with the newtype wrapper
-* Make sure that it's possible to catch and react to the specific error
-
-Stop using -XGeneralizedNewtypeDeriving
-
 Replace the tests' dependency on the cookie package with cookie-jar
 
 Write tests

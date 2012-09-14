@@ -5,20 +5,13 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer
-import Network.HTTP.Types (Status())
 
 import Web.Vorple.Text
 import Web.Vorple.Types
 
-{-
-mapStateT' f = mapStateT f'
-  where
-    f' (x, s) = (f x, s)
--}
-
 mapVorple
-  :: (  StateT s m (Either Status a, ByteString)
-     -> StateT t n (Either Status b, ByteString)
+  :: (  StateT s m (Either HttpStatus a, ByteString)
+     -> StateT t n (Either HttpStatus b, ByteString)
      )
   -> Vorple e s m a
   -> Vorple e t n b
@@ -29,7 +22,7 @@ mapVorple f =
 
 mapInternal
   :: (Monad m, Monad n)
-  => (m (Either Status a, ByteString) -> n (Either Status b, ByteString))
+  => (m (Either HttpStatus a, ByteString) -> n (Either HttpStatus b, ByteString))
   -> Internal e m a
   -> Internal e n b
 mapInternal = mapVorple . (lift .) . (. flip evalStateT ())
@@ -51,7 +44,7 @@ runInternal
   => Internal e m a
   -> Options
   -> e
-  -> m (Either Status a, ByteString)
+  -> m (Either HttpStatus a, ByteString)
 runInternal internal opts env = inner
   where
     error = getVorple internal

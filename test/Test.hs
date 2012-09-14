@@ -79,7 +79,7 @@ testAppKey1 = multiTest "testAppKey1" $ do
     s = do
       r <- rj $ Csrf "" $ CmdPut $ Rec1a 1 1
       assertStatus 200 r
-      assertJsonBody initState r
+      _ <- assertJsonBody initState r
       assertCookie r
 
 main =

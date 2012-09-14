@@ -1,5 +1,4 @@
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Web.Vorple.Types where
 
 import Control.Monad.Error
@@ -9,6 +8,8 @@ import Control.Monad.Writer
 import Network.HTTP.Types (Status(), status500)
 
 import Web.Vorple.Text
+
+newtype HttpStatus = HttpStatus { getStatus :: Status } deriving (Eq, Ord, Show)
 
 -- |Log levels
 data LogLevel =
@@ -53,7 +54,7 @@ defaultOptions = Options
 
 -- |A monad transformer for a JSON-over-HTTP application
 newtype Vorple e s m a = Vorple
-  { getVorple :: ErrorT Status
+  { getVorple :: ErrorT HttpStatus
             (WriterT ByteString
             (ReaderT (e, Options)
             (StateT s m))) a }
@@ -81,8 +82,8 @@ class MonadOptions m where
 instance (Monad m) => MonadOptions (Vorple e s m) where
   asksOpt = Vorple . asks . (. snd)
 
-instance Error Status where
-  noMsg = status500
+instance Error HttpStatus where
+  noMsg = HttpStatus status500
 
 instance (Monad m) => Monad (Vorple e s m) where
   return = Vorple . return
@@ -94,9 +95,15 @@ instance MonadTrans (Vorple e s) where
 
 -- |With this instance, you can throw an HTTP error code to abort the request
 -- and return that code to the client
-instance (Monad m) => MonadError Status (Vorple e s m) where
+instance (Monad m) => MonadError HttpStatus (Vorple e s m) where
   throwError     = Vorple . throwError
   catchError m f = Vorple $ getVorple m `catchError` (getVorple . f)
+
+throwStatus :: (MonadError HttpStatus m) => Status -> m a
+throwStatus = throwError . HttpStatus
+
+catchStatus :: (MonadError HttpStatus m) => m a -> (Status -> m a) -> m a
+catchStatus = flip $ flip catchError . (. getStatus)
 
 -- |This instance provides access to the environment that you specify when creating
 -- the application

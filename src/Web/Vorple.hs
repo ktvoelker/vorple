@@ -12,6 +12,9 @@ module Web.Vorple (
   , Options(..)
   , LogLevel(..)
   , MonadOptions(..)
+  -- * HTTP errors
+  , throwStatus
+  , catchStatus
   -- * Logging functions
   , debug
   , info
@@ -19,7 +22,6 @@ module Web.Vorple (
   , err
   , crit
   -- * Re-exported functions
-  , throwError
   , ask
   , asks
   , get
@@ -46,11 +48,11 @@ import Web.Vorple.Text
 import Web.Vorple.Types
 import Web.Vorple.Util
 
-require :: (MonadError H.Status m) => Bool -> m ()
-require c = when (not c) $ throwError H.status400
+require :: (MonadError HttpStatus m) => Bool -> m ()
+require c = when (not c) $ throwStatus H.status400
 
-requireJust :: (MonadError H.Status m) => Maybe a -> m a
-requireJust = maybe (throwError H.status400) return
+requireJust :: (MonadError HttpStatus m) => Maybe a -> m a
+requireJust = maybe (throwStatus H.status400) return
 
 randomKey :: Int -> IO [Word8]
 randomKey n = mapM (const $ getStdRandom random) [1 .. n]
@@ -67,10 +69,10 @@ vorpleT
 vorpleT runner opts env emptySession handler req = liftIO $ do
   appKey <- maybe (randomKey 32) return $ optAppKey opts
   (result, log) <- flip (flip runInternal opts) env $ do
-    when (W.requestMethod req /= H.methodPost) $ throwError H.status405
+    when (W.requestMethod req /= H.methodPost) $ throwStatus H.status405
     $(say "Got a POST")
     maybeInput <- liftIO $ decodeJSONSource $ W.requestBody req
-    input <- maybe (throwError H.status400) return maybeInput
+    input <- maybe (throwStatus H.status400) return maybeInput
     $(say "Got JSON data")
     cookie <- getCookie appKey (W.requestHeaders req)
     (csrfKey, session) <- case cookie of
@@ -97,7 +99,7 @@ vorpleT runner opts env emptySession handler req = liftIO $ do
   BS.hPutStr stderr log
   let
   { (status, body, cookie) = case result of
-      Left status          -> (status, encodeJSONBuilder (), Nothing)
+      Left status          -> (getStatus status, encodeJSONBuilder (), Nothing)
       Right (body, cookie) -> (H.status200, encodeJSONBuilder body, cookie)
   }
   return $ W.ResponseBuilder status (maybeToList cookie) body

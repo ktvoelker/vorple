@@ -11,22 +11,18 @@ module Util
   , runSession
   ) where
 
-import qualified Data.ByteString as SBS
 import qualified Data.Text as ST
 import qualified Data.Text.Encoding as STE
 
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Text.Lazy.Encoding
 import Network.HTTP.Types
 import Network.Wai
 import Network.Wai.Test
 import System.Exit
-import System.IO
 import Test.HUnit
 import Web.Vorple
-import Web.Vorple.Text
 
 data Csrf a
   = Csrf { csrfKey :: String, csrfData :: a }
@@ -34,6 +30,7 @@ data Csrf a
 
 $(deriveJSON (Prelude.drop 4) ''Csrf)
 
+defaultPost :: Request
 defaultPost = defaultRequest { requestMethod = methodPost }
 
 rj :: (ToJSON a) => a -> Session SResponse
