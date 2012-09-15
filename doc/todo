@@ -2,8 +2,6 @@
 To-Do
 =====
 
-Replace the dependency on the cookie package with cookie-jar
-
 Write tests
 * Positive tests
  * Cookie options
@@ -17,6 +15,10 @@ Write tests
  * Send invalid body
  * Use invalid method
  * Use invalid path
+
+Once features based on Section 4 of RFC 6265 have been added to cookie-jar, use them:
+* Cookie printing
+* Strict cookie parsing in test cases
 
 Set better default options
 
