@@ -16,12 +16,12 @@ testEcho1 = sessionTest "testEcho1" appEcho $ do
   let b1 = Rec1a 0 1
   r1 <- rj $ Csrf "" b1
   assertStatus 200 r1
-  assertNoCookie r1
+  assertNoCookie
   k1 <- assertJsonBody b1 r1
   let b2 = Rec1a 1 0
   r2 <- rj $ Csrf "" b2
   assertStatus 200 r2
-  assertNoCookie r2
+  assertNoCookie
   k2 <- assertJsonBody b2 r2
   liftIO $ assertBool "CSRF keys should not be equal" $ k1 /= k2
 
@@ -57,30 +57,30 @@ testState1 = sessionTest "testState1" appState $ do
   assertStatus 200 r2
   k2 <- assertJsonBody initState r2
   liftIO $ assertBool "CSRF keys should not be equal" $ k1 /= k2
-  c2 <- assertCookie r2
+  _ <- assertCookie "s"
   -- set b3, returning b2
   let b3 = Rec1b 3 4
-  r3 <- rjc c2 $ Csrf k2 $ CmdPut b3
+  r3 <- rj $ Csrf k2 $ CmdPut b3
   assertStatus 200 r3
   k3 <- assertJsonBody b2 r3
   liftIO $ assertEqual "CSRF keys" k2 k3
-  c3 <- assertCookie r3
+  _ <- assertCookie "s"
   -- get b3
-  r4 <- rjc c3 $ Csrf k3 CmdGet
+  r4 <- rj $ Csrf k3 CmdGet
   assertStatus 200 r4
   k4 <- assertJsonBody b3 r4
   liftIO $ assertEqual "CSRF keys" k3 k4
 
-testAppKey1 = multiTest "testAppKey1" $ do
-  c1 <- flip runSession (appStateWithKey [1, 2, 3, 4]) s
-  c2 <- flip runSession (appStateWithKey [5, 6, 7, 8]) s
+testAppKey1 = multiTest "testAppKey1" $ \rules -> do
+  c1 <- flip (runSession rules) (appStateWithKey [1, 2, 3, 4]) s
+  c2 <- flip (runSession rules) (appStateWithKey [5, 6, 7, 8]) s
   assertBool "HMAC sums should differ" $ c1 /= c2
   where
     s = do
       r <- rj $ Csrf "" $ CmdPut $ Rec1a 1 1
       assertStatus 200 r
       _ <- assertJsonBody initState r
-      assertCookie r
+      assertCookie "s"
 
 main =
   runTests

@@ -99,8 +99,10 @@ Test-Suite vorple-tests
     attoparsec -any,
     attoparsec-conduit -any,
     http-types -any,
+    wai -any,
     cookie -any,
-    wai -any
+    cookie-jar -any,
+    time -any
   default-extensions:
     FlexibleContexts
     FlexibleInstances

@@ -2,7 +2,7 @@
 To-Do
 =====
 
-Replace the tests' dependency on the cookie package with cookie-jar
+Replace the dependency on the cookie package with cookie-jar
 
 Write tests
 * Positive tests
