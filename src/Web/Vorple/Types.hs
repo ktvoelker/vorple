@@ -9,6 +9,8 @@ import Network.HTTP.Types (Status(), status500)
 
 import Web.Vorple.Text
 
+-- |A wrapper for HTTP 'Status' codes so that this module can provide
+-- a non-orphan @instance 'Error' 'Status'@
 newtype HttpStatus = HttpStatus { getStatus :: Status } deriving (Eq, Ord, Show)
 
 -- |Log levels
@@ -42,13 +44,13 @@ data Options = Options
   , optSecureCookie  :: Bool
   } deriving (Eq, Ord, Read, Show)
 
--- |A default set of options
+-- |The default options
 defaultOptions :: Options
 defaultOptions = Options
-  { optLogLevel      = VorpleDebug
+  { optLogLevel      = Debug
   , optAppKey        = Nothing
   , optCookieName    = "s"
-  , optCookiePath    = Just "/"
+  , optCookiePath    = Nothing
   , optSecureCookie  = False
   }
 
@@ -76,7 +78,9 @@ data Csrf a = Csrf
 
 $(deriveJSON (drop 4) ''Csrf)
 
+-- |A class for monads from which 'Options' can be read
 class MonadOptions m where
+  -- |Get a projection of the current 'Options'
   asksOpt :: (Options -> a) -> m a
 
 instance (Monad m) => MonadOptions (Vorple e s m) where
@@ -99,9 +103,11 @@ instance (Monad m) => MonadError HttpStatus (Vorple e s m) where
   throwError     = Vorple . throwError
   catchError m f = Vorple $ getVorple m `catchError` (getVorple . f)
 
+-- |Throw a 'Status' as an 'HttpStatus' error
 throwStatus :: (MonadError HttpStatus m) => Status -> m a
 throwStatus = throwError . HttpStatus
 
+-- |Catch an 'HttpStatus' error as a 'Status'
 catchStatus :: (MonadError HttpStatus m) => m a -> (Status -> m a) -> m a
 catchStatus = flip $ flip catchError . (. getStatus)
 

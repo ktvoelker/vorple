@@ -72,11 +72,26 @@ note level xs = let cs = parseControls xs in do
     -- Wrap with a lambda
     p body name = lamE [varP name] body
 
-say, debug, info, warn, err, crit :: String -> ExpQ
+say :: String -> ExpQ
 say   = note 'VorpleDebug
+
+-- |Make a function that logs at 'Debug' using the given format string
+debug :: String -> ExpQ
 debug = note 'Debug
+
+-- |Make a function that logs at 'Info' using the given format string
+info :: String -> ExpQ
 info  = note 'Info
+
+-- |Make a function that logs at 'Warning' using the given format string
+warn :: String -> ExpQ
 warn  = note 'Warning
+
+-- |Make a function that logs at 'Error' using the given format string
+err :: String -> ExpQ
 err   = note 'Error
+
+-- |Make a function that logs at 'Critical' using the given format string
+crit :: String -> ExpQ
 crit  = note 'Critical
 

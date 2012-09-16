@@ -3,7 +3,6 @@ module Util
   ( module Util
   , module Control.Monad.State
   , module Web.Vorple
-  , deriveJSON
   , assertBool
   , assertFailure
   , assertEqual

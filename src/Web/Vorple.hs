@@ -13,9 +13,11 @@ module Web.Vorple (
   , LogLevel(..)
   , MonadOptions(..)
   -- * HTTP errors
+  , HttpStatus(..)
   , throwStatus
   , catchStatus
   -- * Logging functions
+  -- $logging
   , debug
   , info
   , warn
@@ -28,6 +30,7 @@ module Web.Vorple (
   , put
   , modify
   , liftIO
+  , deriveJSON
   ) where
 
 import Control.Monad.Error
@@ -48,6 +51,23 @@ import Web.Vorple.Text
 import Web.Vorple.Types
 import Web.Vorple.Util
 
+-- $logging
+-- Logging uses the 'MonadWriter' instance of 'Vorple'. Convenience functions
+-- for logging are provided which use Template Haskell. These functions accept
+-- a /format string/ in the style of @printf@, but with a different set of
+-- format codes. The Template Haskell function then splices in a function which
+-- takes one argument for each hole left by a format code in the format string.
+--
+-- The format codes:
+--
+--   * @%b@ accepts a 'ByteString'
+--
+--   * @%s@ accepts a 'Text'
+--
+--   * @%j@ accepts anything with a 'ToJSON' instance
+--
+--   * @%p@ accepts anything with a 'Show' instance
+
 require :: (MonadError HttpStatus m) => Bool -> m ()
 require c = when (not c) $ throwStatus H.status400
 
@@ -57,7 +77,7 @@ requireJust = maybe (throwStatus H.status400) return
 randomKey :: Int -> IO [Word8]
 randomKey n = mapM (const $ getStdRandom random) [1 .. n]
 
--- |Make a WAI Application from a request handler with any inner monad
+-- |Make an 'Application' from a request handler with any inner monad
 vorpleT
   :: forall a b e m s. (Monad m, FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
   => (forall x. m x -> IO x)  -- ^The runner for the inner monad
@@ -104,7 +124,7 @@ vorpleT runner opts env emptySession handler req = liftIO $ do
   }
   return $ W.ResponseBuilder status (maybeToList cookie) body
 
--- |Make a WAI Application from an IO request handler
+-- |Make an 'Application' from an 'IO' request handler
 vorpleIO
   :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
   => Options                  -- ^Options
@@ -114,7 +134,7 @@ vorpleIO
   -> W.Application            -- ^The application
 vorpleIO = vorpleT id
 
--- |Make a WAI Application from a pure request handler
+-- |Make an 'Application' from a pure request handler
 vorple
   :: (FromJSON a, ToJSON b, FromJSON s, ToJSON s, Eq s)
   => Options                       -- ^Options

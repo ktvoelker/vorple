@@ -2,6 +2,17 @@
 To-Do
 =====
 
+Write a README
+
+Write Haddock documentation
+* Package description
+
+Add better package version dependencies
+
+Once features based on Section 4 of RFC 6265 have been added to cookie-jar, use them:
+* Cookie printing
+* Strict cookie parsing in test cases
+
 Write tests
 * Positive tests
  * Throw error
@@ -16,19 +27,4 @@ Write tests
  * Send invalid body
  * Use invalid method
  * Use invalid path
-
-Once features based on Section 4 of RFC 6265 have been added to cookie-jar, use them:
-* Cookie printing
-* Strict cookie parsing in test cases
-
-Set better default options
-
-Write a README
-
-Write Haddock documentation
-* Package description
-* Logging functions
-* Internal functions
-
-Add better package version dependencies
 
