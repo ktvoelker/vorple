@@ -11,7 +11,8 @@ homepage: https://github.com/ktvoelker/vorple
 maintainer: Karl Voelker <ktvoelker@gmail.com>
 synopsis: A simple web framework
 description:
-  Vorple is a simple web framework for Haskell.
+  Vorple is a simple web framework for Haskell. You may want to start by looking
+  at the example, "Web.Vorple.Example", before looking at the API in "Web.Vorple".
 category: Web
 author: Karl Voelker <ktvoelker@gmail.com>
 
@@ -37,6 +38,7 @@ Library
     wai -any
   exposed-modules:
     Web.Vorple
+    Web.Vorple.Example
   other-modules:
     Web.Vorple.Cookie
     Web.Vorple.Log

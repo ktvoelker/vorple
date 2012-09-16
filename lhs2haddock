@@ -1,0 +1,21 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my ($module) = @ARGV;
+die "Usage: lhs2haddock Output.Module.Name\n" unless $module;
+
+print "-- GENERATED; DO NOT EDIT!\n{- |\n";
+
+my $in_code = 0;
+
+while (<STDIN>) {
+  my $prev = $in_code;
+  $in_code = s/^>// ? 1 : 0;
+  print "\@\n" if $prev != $in_code;
+  print $_;
+}
+
+print "-}\nmodule $module where\n";
+
