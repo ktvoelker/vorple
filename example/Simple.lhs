@@ -32,7 +32,7 @@ Response, with a monad along the way. Which monad is it? It's the
 @Vorple () Session Identity@ monad. Let's break that down:
 
 * 'Vorple': a monad transformer that stacks a bunch of useful monads on top of whatever
-underlying monad your application in needs.
+underlying monad your application needs.
 
 * @()@: the type of the environment exposed by Vorple's built-in 'MonadReader'
 instance, which we aren't using here.
