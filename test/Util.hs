@@ -7,6 +7,7 @@ module Util
   , assertBool
   , assertFailure
   , assertEqual
+  , fromString
   ) where
 
 import qualified Data.Text as T
@@ -17,6 +18,7 @@ import qualified Network.Wai.Test as WT
 import Control.Monad.State
 import Data.Aeson
 import Data.Aeson.TH
+import Data.String
 import Data.Time.Clock
 import Network.HTTP.Types
 import Network.Wai

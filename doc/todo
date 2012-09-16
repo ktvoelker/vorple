@@ -4,11 +4,12 @@ To-Do
 
 Write tests
 * Positive tests
- * Cookie options
+ * Throw error
+ * Cookie security
+ * Cookie path
  * Out-of-order use of cookies
  * Environment consistency
  * Send irrelevant cookie
- * Throw error
 * Negative tests
  * Send invalid CSRF key
  * Send invalid cookie

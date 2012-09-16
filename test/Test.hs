@@ -82,10 +82,29 @@ testAppKey1 = multiTest "testAppKey1" $ \rules -> do
       _ <- assertJsonBody initState r
       assertCookie "s"
 
+appStateNamed name =
+  vorple defaultOptions { optCookieName = name } () initState handleState
+
+testCookieName1 =
+  let
+    name = "c0"
+  in sessionTest "testCookieName1" (appStateNamed $ fromString name) $ do
+    let b1 = Rec1b 0 1
+    r1 <- rj $ Csrf "" $ CmdPut b1
+    assertStatus 200 r1
+    k1 <- assertJsonBody initState r1
+    _ <- assertCookie name
+    r2 <- rj $ Csrf k1 CmdGet
+    assertStatus 200 r2
+    _ <- assertJsonBody b1 r2
+    _ <- assertCookie name
+    return ()
+
 main =
   runTests
   [ testEcho1
   , testState1
   , testAppKey1
+  , testCookieName1
   ]
 
