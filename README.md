@@ -17,3 +17,13 @@ dependencies in a sandbox.
     cd vorple
     cabal-dev install
 
+If you want to run the test suite, you will also need my as-yet-unpublished
+[cookie-jar package](https://github.com/ktvoelker/cookie-jar).
+
+    cd ..
+    git clone git://github.com/ktvoelker/cookie-jar.git
+    cd vorple
+    cabal-dev add-source ../cookie-jar
+    cabal-dev configure --enable-tests
+    cabal-dev test
+
