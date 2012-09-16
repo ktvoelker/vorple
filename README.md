@@ -3,7 +3,9 @@ Vorple, a simple web framework for Haskell
 ==========================================
 
 Vorple is a simple framework for web applications that just want to send and
-receive JSON. Take a look at the [example](https://github.com/ktvoelker/vorple/blob/master/example/Simple.lhs) to see how it works!
+receive JSON.
+
+Take a look at the [example](https://github.com/ktvoelker/vorple/blob/master/example/Simple.lhs) to see how it works!
 
 Installation
 ------------
