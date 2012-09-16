@@ -15,13 +15,19 @@ description:
   at the example, "Web.Vorple.Example", before looking at the API in "Web.Vorple".
 category: Web
 author: Karl Voelker <ktvoelker@gmail.com>
+data-files:
+  data/effective_tld_names.dat
+
+Flag examples
+  Description: Build example programs
+  Default: False
+  Manual: True
 
 Library
   build-depends:
     base >= 3 && < 5,
     split -any,
     mtl -any,
-    operational -any,
     template-haskell -any,
     text -any,
     bytestring -any,
@@ -61,76 +67,26 @@ Library
     TupleSections
     UndecidableInstances
 
-Executable vorple-example-main
-  hs-source-dirs: example
-  ghc-options: -Wall -Werror -fno-warn-name-shadowing
-  default-language: Haskell2010
-  main-is: Main.hs
-  build-depends:
-    base >= 3 && < 5,
-    mtl -any,
-    aeson -any,
-    postgresql-simple -any,
-    wai-handler-fastcgi -any,
-    vorple -any
-  default-extensions:
-    OverloadedStrings
-    RecordWildCards
-    TemplateHaskell
-
 Test-Suite vorple-tests
   type: exitcode-stdio-1.0
-  hs-source-dirs: src test
+  hs-source-dirs: test
   ghc-options: -Wall -Werror -fno-warn-name-shadowing -fno-warn-missing-signatures
   default-language: Haskell2010
   main-is: Test.hs
+  other-modules:
+    Util
+    Paths_vorple
   build-depends:
     base >= 3 && < 5,
     HUnit -any,
     wai-test -any,
-    split -any,
     mtl -any,
-    operational -any,
-    template-haskell -any,
     text -any,
-    bytestring -any,
-    blaze-builder -any,
-    dataenc -any,
-    Crypto -any,
-    random -any,
     aeson -any,
-    conduit -any,
-    attoparsec -any,
-    attoparsec-conduit -any,
     http-types -any,
     wai -any,
-    cookie -any,
     cookie-jar -any,
-    time -any
-  default-extensions:
-    FlexibleContexts
-    FlexibleInstances
-    FunctionalDependencies
-    MultiParamTypeClasses
-    OverloadedStrings
-    RankNTypes
-    RecordWildCards
-    ScopedTypeVariables
-    TemplateHaskell
-    TupleSections
-    UndecidableInstances
-
-Executable vorple-example-listen
-  hs-source-dirs: example
-  ghc-options: -Wall -Werror -fno-warn-name-shadowing
-  default-language: Haskell2010
-  main-is: Listen.hs
-  build-depends:
-    base >= 3 && < 5,
-    mtl -any,
-    aeson -any,
-    postgresql-simple -any,
-    wai-handler-fastcgi -any,
+    time -any,
     vorple -any
   default-extensions:
     OverloadedStrings
@@ -138,6 +94,10 @@ Executable vorple-example-listen
     TemplateHaskell
 
 Executable vorple-example-simple
+  if flag(examples)
+    buildable: True
+  else
+    buildable: False
   hs-source-dirs: example
   ghc-options: -Wall -Werror -fno-warn-name-shadowing
   default-language: Haskell2010

@@ -26,6 +26,8 @@ import Test.HUnit
 import Web.CookieJar
 import Web.Vorple
 
+import Paths_vorple
+
 data Csrf a
   = Csrf { csrfKey :: String, csrfData :: a }
   deriving (Eq, Ord, Read, Show)
@@ -103,7 +105,7 @@ multiTest n f r = TestLabel n . TestCase . f $ r
 
 runTests :: [Maybe P.Rules -> Test] -> IO ()
 runTests tests = do
-  rulesText <- readFile "data/effective_tld_names.dat"
+  rulesText <- getDataFileName "data/effective_tld_names.dat" >>= readFile 
   let rules = P.parseRules rulesText
   c <- runTestTT . TestList . map ($ Just rules) $ tests
   when (errors c /= 0 || failures c /= 0) exitFailure
