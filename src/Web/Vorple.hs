@@ -95,30 +95,32 @@ vorpleT runner opts env emptySession handler req = liftIO $ do
     input <- maybe (throwStatus H.status400) return maybeInput
     $(say "Got JSON data")
     cookie <- getCookie appKey (W.requestHeaders req)
-    (csrfKey, session) <- case cookie of
+    (setCsrfKey, session) <- case cookie of
       Nothing -> do
         $(say "No cookie; generating CSRF key")
         csrfKey <- liftIO (randomKey 32) >>= return . encodeBase64
         return (csrfKey, emptySession)
       Just cookie -> do
         $(say "Got cookie")
-        require $ csrfKey input == cCsrfKey cookie
-        $(say "CSRF key matches")
         session <- requireJust $ decodeJSON $ cAppData cookie
         return (cCsrfKey cookie, session)
     (response, nextSession) <-
       case csrfData input of
         Nothing -> return (Nothing, session)
-        Just input ->
-          mapInternal (liftIO . runner) (runVorpleInternal (handler input) session)
-          >>= return . \(r, s) -> (Just r, s)
+        Just inputData -> do
+          require $ csrfKey input == setCsrfKey
+          $(say "CSRF key matches")
+          (response, nextSession) <-
+            mapInternal (liftIO . runner)
+            $ runVorpleInternal (handler inputData) session
+          return (Just response, nextSession)
     $(say "Ran request handler")
     cookie <-
-      if session /= nextSession
-      then setCookie appKey csrfKey (encodeJSON nextSession) >>= return . Just
+      if isNothing cookie || session /= nextSession
+      then setCookie appKey setCsrfKey (encodeJSON nextSession) >>= return . Just
       else return Nothing
     $(say "About to return response")
-    return (Csrf csrfKey response, cookie)
+    return (Csrf setCsrfKey response, cookie)
   BS.hPutStr stderr log
   let
   { (status, body, cookie) = case result of

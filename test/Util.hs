@@ -29,7 +29,7 @@ import Web.Vorple
 import Paths_vorple
 
 data Csrf a
-  = Csrf { csrfKey :: String, csrfData :: a }
+  = Csrf { csrfKey :: String, csrfData :: Maybe a }
   deriving (Eq, Ord, Read, Show)
 
 $(deriveJSON (Prelude.drop 4) ''Csrf)
@@ -73,7 +73,8 @@ assertStatus n = lift . WT.assertStatus n
 
 -- | Assert that the response body is the given JSON object wrapped in a Csrf
 -- object, and return the CSRF key string.
-assertJsonBody :: (FromJSON a, Eq a, Show a) => a -> WT.SResponse -> Session String
+assertJsonBody
+  :: (FromJSON a, Eq a, Show a) => Maybe a -> WT.SResponse -> Session String
 assertJsonBody expBody xs = do
   case decode . WT.simpleBody $ xs of
     Nothing -> do
