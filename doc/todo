@@ -2,6 +2,10 @@
 To-Do
 =====
 
+If the user doesn't have a cookie, set one
+
+Document the JSON protocol
+
 Once features based on Section 4 of RFC 6265 have been added to cookie-jar, use them:
 * Cookie printing
 * Strict cookie parsing in test cases

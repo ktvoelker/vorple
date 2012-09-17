@@ -73,7 +73,7 @@ $(deriveJSON (drop 1) ''Cookie)
 
 data Csrf a = Csrf
   { csrfKey  :: Base64
-  , csrfData :: a
+  , csrfData :: Maybe a
   }
 
 $(deriveJSON (drop 4) ''Csrf)

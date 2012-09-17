@@ -107,8 +107,11 @@ vorpleT runner opts env emptySession handler req = liftIO $ do
         session <- requireJust $ decodeJSON $ cAppData cookie
         return (cCsrfKey cookie, session)
     (response, nextSession) <-
-      mapInternal (liftIO . runner)
-      $ runVorpleInternal (handler $ csrfData input) session
+      case csrfData input of
+        Nothing -> return (Nothing, session)
+        Just input ->
+          mapInternal (liftIO . runner) (runVorpleInternal (handler input) session)
+          >>= return . \(r, s) -> (Just r, s)
     $(say "Ran request handler")
     cookie <-
       if session /= nextSession
